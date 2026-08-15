@@ -144,13 +144,24 @@ var activePitchClasses = null;
 var activeMidiSet = null;
 var activeChordName = null;
 var hasTonal = typeof Tonal !== 'undefined' && Tonal.Chord;
-var NOISE_FLOOR_DB = -70;
-var ONSET_MARGIN_DB = 15;
-var SUSTAIN_MARGIN_DB = 10;
+var NOISE_FLOOR_DB = -80;
 var HOLD_FRAMES = 12;
 var holdFramesLeft = 0;
 var noiseEstimate = -100;
 var noiseInitialized = false;
+
+function getOnsetMargin() {
+    var val = parseInt(document.getElementById('sensitivity').value) || 50;
+    return 20 - val * 0.15;
+}
+
+function getSustainMargin() {
+    return getOnsetMargin() * 0.5;
+}
+
+function getNoiseEstMargin() {
+    return getOnsetMargin() * 0.2;
+}
 
 function freqToMidi(freq) {
     return Math.round(12 * Math.log2(freq / 440) + 69);
@@ -168,9 +179,9 @@ function findPeaks(spec, sampleRate, fftSize) {
     for (var i = 0; i < len; i += 8) sample.push(spec[i]);
     sample.sort(function(a, b) { return a - b; });
     var medianDb = sample[Math.floor(sample.length / 2)];
-    var threshold = Math.max(maxDb - 40, medianDb + 25, NOISE_FLOOR_DB);
+    var threshold = Math.max(maxDb - 40, medianDb + 15, NOISE_FLOOR_DB);
     if (noiseInitialized) {
-        threshold = Math.max(threshold, noiseEstimate + 5);
+        threshold = Math.max(threshold, noiseEstimate + getNoiseEstMargin());
     }
     var peaks = [];
     for (var i = 2; i < len - 2; i++) {
@@ -316,7 +327,7 @@ function analyze() {
 
     if (holdFramesLeft > 0) {
         holdFramesLeft--;
-        if (maxDb > noiseEstimate + SUSTAIN_MARGIN_DB) {
+        if (maxDb > noiseEstimate + getSustainMargin()) {
             holdFramesLeft = HOLD_FRAMES;
         }
         silenceCount = 0;
@@ -355,7 +366,7 @@ function analyze() {
         highlightFretboard(chordName, pitchClasses, activeMidiSet);
     } else {
         noiseEstimate = noiseEstimate * 0.95 + maxDb * 0.05;
-        if (maxDb > noiseEstimate + ONSET_MARGIN_DB && maxDb > NOISE_FLOOR_DB) {
+        if (maxDb > noiseEstimate + getOnsetMargin() && maxDb > NOISE_FLOOR_DB) {
             holdFramesLeft = HOLD_FRAMES;
             stabilityWindow = [];
             lastStableKey = '';

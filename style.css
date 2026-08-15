@@ -147,6 +147,23 @@ select {
     border-color: #c44;
 }
 
+.sensitivity-control {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.sensitivity-control span {
+    white-space: nowrap;
+}
+
+.sensitivity-control input[type="range"] {
+    width: 80px;
+    accent-color: #4a6fa5;
+}
+
 .chord-display {
     flex: 1;
 }
