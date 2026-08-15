@@ -266,7 +266,7 @@ function applyScale(root, typeName) {
     var notes = scale.notes.map(toSharp);
     var notesSet = new Set(notes);
     var label = tonic + ' ' + typeName;
-    activeScale = { notes: notesSet, tonic: tonic, label: label };
+    activeScale = { notes: notesSet, tonic: tonic, label: label, type: typeName };
     displayScale(label, notes);
     highlightAll();
     renderScaleMatches();
@@ -305,7 +305,7 @@ function renderScaleMatches() {
     labelEl.textContent = activeChord.label + ' appears in ' + matches.length + ' scale' + (matches.length !== 1 ? 's' : '') + ':';
     var html = '';
     matches.forEach(function(m) {
-        var isActive = activeScale && activeScale.tonic === m.root && activeScale.label.indexOf(m.type) !== -1;
+        var isActive = activeScale && activeScale.tonic === m.root && activeScale.type === m.type;
         html += '<button class="match-chip' + (isActive ? ' active' : '') + '" data-root="' + m.root + '" data-type="' + m.type + '">' + m.label + '</button>';
     });
     listEl.innerHTML = html;
