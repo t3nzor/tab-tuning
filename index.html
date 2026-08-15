@@ -15,12 +15,10 @@
         </div>
         <div class="tuning-row" id="tuning-selects"></div>
     </div>
-    <div class="listen-row">
-        <button id="listen-btn">Listen</button>
-        <label class="sensitivity-control">
-            <span>Sensitivity</span>
-            <input type="range" id="sensitivity" min="0" max="100" value="50">
-        </label>
+    <div class="chord-row">
+        <input type="text" id="chord-input" placeholder="Chord (e.g. Cmaj7, Am, G7)" spellcheck="false">
+        <select id="chord-root"></select>
+        <select id="chord-type"></select>
         <div class="chord-display">
             <div id="chord-name"></div>
             <div id="detected-notes"></div>

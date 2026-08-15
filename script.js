@@ -40,34 +40,18 @@ function getCurrentTuning() {
     return tuning;
 }
 
-function inferStringOctaves(pitchClasses) {
-    var midiNotes = [];
-    for (var i = 0; i < 6; i++) {
-        var pc = NOTES.indexOf(pitchClasses[i]);
-        var midi = 36 + pc;
-        while (i > 0 && midi <= midiNotes[i - 1]) {
-            midi += 12;
-        }
-        midiNotes.push(midi);
-    }
-    return midiNotes;
-}
-
 function renderFretboard() {
     var tuning = getCurrentTuning();
-    var stringMidi = inferStringOctaves(tuning);
     var fretboard = document.getElementById('fretboard');
     var html = '';
 
     for (var s = 5; s >= 0; s--) {
         var openNote = tuning[s];
-        var openMidi = stringMidi[s];
         for (var f = 0; f <= 12; f++) {
             var note = noteAt(openNote, f);
-            var midi = openMidi + f;
             var classes = ['cell'];
             if (f === 0) classes.push('nut');
-            html += '<div class="' + classes.join(' ') + '"><span class="note" data-note="' + note + '" data-midi="' + midi + '">' + note + '</span></div>';
+            html += '<div class="' + classes.join(' ') + '"><span class="note" data-note="' + note + '">' + note + '</span></div>';
         }
     }
 
@@ -81,8 +65,8 @@ function renderFretboard() {
 
     fretboard.innerHTML = html;
 
-    if (activePitchClasses) {
-        highlightFretboard(activeChordName, activePitchClasses, activeMidiSet);
+    if (activeChord) {
+        highlightChord(activeChord);
     }
 }
 
@@ -130,159 +114,59 @@ function applyPreset(preset) {
     }
 }
 
-// ---- Audio / Chord Detection ----
+// ---- Chord Picker ----
 
-var listening = false;
-var audioCtx, analyser, mediaStream, intervalId;
-var spectrum;
-var stabilityWindow = [];
-var STABILITY_SIZE = 6;
-var STABILITY_THRESHOLD = 4;
-var silenceCount = 0;
-var lastStableKey = '';
-var activePitchClasses = null;
-var activeMidiSet = null;
-var activeChordName = null;
 var hasTonal = typeof Tonal !== 'undefined' && Tonal.Chord;
-var NOISE_FLOOR_DB = -80;
-var HOLD_FRAMES = 12;
-var holdFramesLeft = 0;
-var noiseEstimate = -100;
-var noiseInitialized = false;
+var activeChord = null;
 
-function getOnsetMargin() {
-    var val = parseInt(document.getElementById('sensitivity').value) || 50;
-    return 20 - val * 0.15;
-}
+var CHORD_TYPES = [
+    { name: 'major', label: 'Major', symbol: '' },
+    { name: 'minor', label: 'Minor', symbol: 'm' },
+    { name: 'dominant seventh', label: '7', symbol: '7' },
+    { name: 'major seventh', label: 'maj7', symbol: 'maj7' },
+    { name: 'minor seventh', label: 'm7', symbol: 'm7' },
+    { name: 'minor/major seventh', label: 'm(maj7)', symbol: 'mMaj7' },
+    { name: 'sixth', label: '6', symbol: '6' },
+    { name: 'minor sixth', label: 'm6', symbol: 'm6' },
+    { name: 'sixth added ninth', label: '6/9', symbol: '6add9' },
+    { name: 'dominant ninth', label: '9', symbol: '9' },
+    { name: 'major ninth', label: 'maj9', symbol: 'maj9' },
+    { name: 'minor ninth', label: 'm9', symbol: 'm9' },
+    { name: 'suspended second', label: 'sus2', symbol: 'sus2' },
+    { name: 'suspended fourth', label: 'sus4', symbol: 'sus4' },
+    { name: 'suspended fourth seventh', label: '7sus4', symbol: '7sus4' },
+    { name: 'diminished', label: 'dim', symbol: 'dim' },
+    { name: 'diminished seventh', label: 'dim7', symbol: 'dim7' },
+    { name: 'half-diminished', label: 'm7b5', symbol: 'm7b5' },
+    { name: 'augmented', label: 'aug', symbol: 'aug' },
+    { name: 'fifth', label: '5', symbol: '5' },
+];
 
-function getSustainMargin() {
-    return getOnsetMargin() * 0.5;
-}
-
-function getNoiseEstMargin() {
-    return getOnsetMargin() * 0.2;
-}
-
-function freqToMidi(freq) {
-    return Math.round(12 * Math.log2(freq / 440) + 69);
-}
-
-function findPeaks(spec, sampleRate, fftSize) {
-    var binWidth = sampleRate / fftSize;
-    var len = spec.length;
-    var maxDb = -Infinity;
-    for (var i = 0; i < len; i++) {
-        if (spec[i] > maxDb) maxDb = spec[i];
+function toSharp(note) {
+    var s = Tonal.Note.simplify(note);
+    if (s.indexOf('b') !== -1) {
+        s = Tonal.Note.enharmonic(s);
     }
-    if (maxDb < NOISE_FLOOR_DB) return [];
-    var sample = [];
-    for (var i = 0; i < len; i += 8) sample.push(spec[i]);
-    sample.sort(function(a, b) { return a - b; });
-    var medianDb = sample[Math.floor(sample.length / 2)];
-    var threshold = Math.max(maxDb - 40, medianDb + 15, NOISE_FLOOR_DB);
-    if (noiseInitialized) {
-        threshold = Math.max(threshold, noiseEstimate + getNoiseEstMargin());
-    }
-    var peaks = [];
-    for (var i = 2; i < len - 2; i++) {
-        if (spec[i] >= spec[i - 1] && spec[i] >= spec[i + 1] &&
-            spec[i] >= spec[i - 2] && spec[i] >= spec[i + 2] &&
-            spec[i] > threshold) {
-            var neighborMax = Math.max(spec[i - 1], spec[i + 1]);
-            if (spec[i] - neighborMax < 4) continue;
-            var a = spec[i - 1], b = spec[i], c = spec[i + 1];
-            var denom = a - 2 * b + c;
-            var shift = denom !== 0 ? 0.5 * (a - c) / denom : 0;
-            var freq = (i + shift) * binWidth;
-            if (freq >= 75 && freq <= 1300) {
-                peaks.push({ freq: freq, db: b });
-            }
-        }
-    }
-    return peaks;
+    return s;
 }
 
-function filterHarmonics(peaks) {
-    var result = [];
-    for (var i = 0; i < peaks.length; i++) {
-        var f = peaks[i].freq;
-        var isHarmonic = false;
-        for (var j = 0; j < peaks.length; j++) {
-            if (i === j) continue;
-            var lower = peaks[j].freq;
-            if (lower >= f) continue;
-            for (var k = 2; k <= 4; k++) {
-                if (Math.abs(f - lower * k) / (lower * k) < 0.03) {
-                    isHarmonic = true;
-                    break;
-                }
-            }
-            if (isHarmonic) break;
-        }
-        if (!isHarmonic) result.push(peaks[i]);
-    }
-    return result;
+function displayChord(label, notes) {
+    document.getElementById('chord-name').textContent = label || '';
+    document.getElementById('detected-notes').textContent = notes ? notes.join(' ') : '';
 }
 
-function updateStability(midiNotes) {
-    var frame = {};
-    midiNotes.forEach(function(m) { frame[m] = true; });
-    stabilityWindow.push(frame);
-    if (stabilityWindow.length > STABILITY_SIZE) {
-        stabilityWindow.shift();
-    }
-    var counts = {};
-    stabilityWindow.forEach(function(f) {
-        Object.keys(f).forEach(function(m) {
-            counts[m] = (counts[m] || 0) + 1;
-        });
-    });
-    var stable = [];
-    Object.keys(counts).forEach(function(m) {
-        if (counts[m] >= STABILITY_THRESHOLD) {
-            stable.push(parseInt(m));
-        }
-    });
-    return stable.sort(function(a, b) { return a - b; });
-}
-
-function detectChord(midiNotes) {
-    var pitchClasses = [];
-    var seen = {};
-    midiNotes.forEach(function(midi) {
-        var pc = NOTES[midi % 12];
-        if (!seen[pc]) {
-            seen[pc] = true;
-            pitchClasses.push(pc);
-        }
-    });
-    if (pitchClasses.length < 2 || !hasTonal) return null;
-    var detected = Tonal.Chord.detect(pitchClasses);
-    if (!detected || detected.length === 0) return null;
-    return detected[0];
-}
-
-function highlightFretboard(chordName, pitchClasses, midiSet) {
-    var root = null;
-    if (chordName && hasTonal) {
-        var info = Tonal.Chord.get(chordName);
-        root = info.tonic;
-    }
+function highlightChord(chord) {
     var notes = document.querySelectorAll('.fretboard .note');
     for (var i = 0; i < notes.length; i++) {
         var el = notes[i];
         var pc = el.getAttribute('data-note');
-        var midi = parseInt(el.getAttribute('data-midi'));
-        el.classList.remove('chord-tone', 'chord-root', 'exact-pitch');
-        if (pitchClasses.has(pc)) {
-            if (pc === root) {
+        el.classList.remove('chord-tone', 'chord-root');
+        if (chord.notes.has(pc)) {
+            if (pc === chord.tonic) {
                 el.classList.add('chord-root');
             } else {
                 el.classList.add('chord-tone');
             }
-        }
-        if (midiSet.has(midi)) {
-            el.classList.add('exact-pitch');
         }
     }
 }
@@ -290,168 +174,87 @@ function highlightFretboard(chordName, pitchClasses, midiSet) {
 function clearHighlights() {
     var notes = document.querySelectorAll('.fretboard .note');
     for (var i = 0; i < notes.length; i++) {
-        notes[i].classList.remove('chord-tone', 'chord-root', 'exact-pitch');
+        notes[i].classList.remove('chord-tone', 'chord-root');
     }
 }
 
-function updateStatus(chordName, midiNotes) {
-    var chordEl = document.getElementById('chord-name');
-    var notesEl = document.getElementById('detected-notes');
-    chordEl.textContent = chordName || '';
-    if (midiNotes && midiNotes.length > 0) {
-        notesEl.textContent = midiNotes.map(function(m) {
-            return NOTES[m % 12] + (Math.floor(m / 12) - 1);
-        }).join(' ');
-    } else {
-        notesEl.textContent = '';
-    }
-}
-
-function analyze() {
-    if (!analyser) return;
-    if (!spectrum || spectrum.length !== analyser.frequencyBinCount) {
-        spectrum = new Float32Array(analyser.frequencyBinCount);
-    }
-    analyser.getFloatFrequencyData(spectrum);
-
-    var maxDb = -Infinity;
-    for (var i = 0; i < spectrum.length; i++) {
-        if (spectrum[i] > maxDb) maxDb = spectrum[i];
-    }
-
-    if (!noiseInitialized) {
-        noiseEstimate = maxDb;
-        noiseInitialized = true;
+function applyChord(symbol) {
+    var input = document.getElementById('chord-input');
+    if (!symbol || !symbol.trim()) {
+        input.classList.remove('invalid');
+        activeChord = null;
+        clearHighlights();
+        displayChord(null, null);
         return;
     }
-
-    if (holdFramesLeft > 0) {
-        holdFramesLeft--;
-        if (maxDb > noiseEstimate + getSustainMargin()) {
-            holdFramesLeft = HOLD_FRAMES;
-        }
-        silenceCount = 0;
-
-        var sampleRate = audioCtx.sampleRate;
-        var fftSize = analyser.fftSize;
-        var peaks = findPeaks(spectrum, sampleRate, fftSize);
-        if (peaks.length === 0) return;
-
-        peaks = filterHarmonics(peaks);
-        var midiNotes = peaks.map(function(p) { return freqToMidi(p.freq); });
-        var stable = updateStability(midiNotes);
-
-        var stableKey = stable.join(',');
-        if (stableKey === lastStableKey) return;
-        lastStableKey = stableKey;
-
-        if (stable.length === 0) {
-            activePitchClasses = null;
-            activeMidiSet = null;
-            activeChordName = null;
-            clearHighlights();
-            updateStatus(null, []);
-            return;
-        }
-
-        var pitchClasses = new Set();
-        stable.forEach(function(m) { pitchClasses.add(NOTES[m % 12]); });
-        var chordName = detectChord(stable);
-
-        activePitchClasses = pitchClasses;
-        activeMidiSet = new Set(stable);
-        activeChordName = chordName;
-
-        updateStatus(chordName, stable);
-        highlightFretboard(chordName, pitchClasses, activeMidiSet);
-    } else {
-        noiseEstimate = noiseEstimate * 0.95 + maxDb * 0.05;
-        if (maxDb > noiseEstimate + getOnsetMargin() && maxDb > NOISE_FLOOR_DB) {
-            holdFramesLeft = HOLD_FRAMES;
-            stabilityWindow = [];
-            lastStableKey = '';
-            silenceCount = 0;
-        } else {
-            silenceCount++;
-            if (silenceCount > 15 && activePitchClasses) {
-                activePitchClasses = null;
-                activeMidiSet = null;
-                activeChordName = null;
-                clearHighlights();
-                updateStatus(null, []);
-                lastStableKey = '';
-            }
-        }
+    if (!hasTonal) {
+        input.classList.add('invalid');
+        activeChord = null;
+        clearHighlights();
+        displayChord(null, null);
+        return;
+    }
+    var chord = Tonal.Chord.get(symbol.trim());
+    if (chord.empty || !chord.tonic) {
+        input.classList.add('invalid');
+        activeChord = null;
+        clearHighlights();
+        displayChord(null, null);
+        return;
+    }
+    input.classList.remove('invalid');
+    var tonic = toSharp(chord.tonic);
+    var notes = chord.notes.map(toSharp);
+    var notesSet = new Set(notes);
+    activeChord = { notes: notesSet, tonic: tonic, label: symbol.trim() };
+    displayChord(symbol.trim(), notes);
+    highlightChord(activeChord);
+    document.getElementById('chord-root').value = tonic;
+    var typeEntry = CHORD_TYPES.find(function(t) { return t.name === chord.type; });
+    if (typeEntry) {
+        document.getElementById('chord-type').value = chord.type;
     }
 }
 
-function startListening() {
-    navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-    }).then(function(stream) {
-        mediaStream = stream;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        var source = audioCtx.createMediaStreamSource(stream);
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 32768;
-        analyser.smoothingTimeConstant = 0.8;
-        source.connect(analyser);
-
-        listening = true;
-        document.getElementById('listen-btn').textContent = 'Stop';
-        document.getElementById('listen-btn').classList.add('listening');
-
-        silenceCount = 0;
-        stabilityWindow = [];
-        lastStableKey = '';
-        activePitchClasses = null;
-        activeMidiSet = null;
-        activeChordName = null;
-        holdFramesLeft = 0;
-        noiseEstimate = -100;
-        noiseInitialized = false;
-
-        intervalId = setInterval(analyze, 100);
-    }).catch(function(err) {
-        console.error('Mic access denied:', err);
-        document.getElementById('chord-name').textContent = 'Mic access denied';
+function initChordControls() {
+    var rootSelect = document.getElementById('chord-root');
+    NOTES.forEach(function(note) {
+        var option = document.createElement('option');
+        option.value = note;
+        option.textContent = note;
+        rootSelect.appendChild(option);
     });
-}
 
-function stopListening() {
-    if (intervalId) { clearInterval(intervalId); intervalId = null; }
-    if (mediaStream) {
-        mediaStream.getTracks().forEach(function(t) { t.stop(); });
-        mediaStream = null;
+    var typeSelect = document.getElementById('chord-type');
+    CHORD_TYPES.forEach(function(t) {
+        var option = document.createElement('option');
+        option.value = t.name;
+        option.textContent = t.label;
+        typeSelect.appendChild(option);
+    });
+
+    var chordInput = document.getElementById('chord-input');
+
+    chordInput.addEventListener('input', function() {
+        applyChord(chordInput.value);
+    });
+
+    function onSelectChange() {
+        var root = rootSelect.value;
+        var type = typeSelect.value;
+        var entry = CHORD_TYPES.find(function(t) { return t.name === type; });
+        var symbol = entry ? root + entry.symbol : root;
+        chordInput.value = symbol;
+        applyChord(symbol);
     }
-    if (audioCtx) { audioCtx.close(); audioCtx = null; }
-    analyser = null;
-    spectrum = null;
-    listening = false;
-    document.getElementById('listen-btn').textContent = 'Listen';
-    document.getElementById('listen-btn').classList.remove('listening');
-    clearHighlights();
-    updateStatus(null, []);
-    activePitchClasses = null;
-    activeMidiSet = null;
-    activeChordName = null;
-    stabilityWindow = [];
-    silenceCount = 0;
-    lastStableKey = '';
-    holdFramesLeft = 0;
-    noiseEstimate = -100;
-    noiseInitialized = false;
-}
 
-function initListen() {
-    var btn = document.getElementById('listen-btn');
-    btn.addEventListener('click', function() {
-        if (listening) {
-            stopListening();
-        } else {
-            startListening();
-        }
-    });
+    rootSelect.addEventListener('change', onSelectChange);
+    typeSelect.addEventListener('change', onSelectChange);
+
+    rootSelect.value = 'C';
+    typeSelect.value = 'major';
+    chordInput.value = 'C';
+    applyChord('C');
 }
 
 // ---- Init ----
@@ -459,7 +262,7 @@ function initListen() {
 document.addEventListener('DOMContentLoaded', function() {
     initPresetSelect();
     initStringSelects();
-    initListen();
+    initChordControls();
 
     var presetSelect = document.getElementById('preset');
     presetSelect.addEventListener('change', function() {
