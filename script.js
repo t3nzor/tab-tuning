@@ -136,14 +136,21 @@ var listening = false;
 var audioCtx, analyser, mediaStream, intervalId;
 var spectrum;
 var stabilityWindow = [];
-var STABILITY_SIZE = 5;
-var STABILITY_THRESHOLD = 3;
+var STABILITY_SIZE = 6;
+var STABILITY_THRESHOLD = 4;
 var silenceCount = 0;
 var lastStableKey = '';
 var activePitchClasses = null;
 var activeMidiSet = null;
 var activeChordName = null;
 var hasTonal = typeof Tonal !== 'undefined' && Tonal.Chord;
+var NOISE_FLOOR_DB = -70;
+var ONSET_MARGIN_DB = 15;
+var SUSTAIN_MARGIN_DB = 10;
+var HOLD_FRAMES = 12;
+var holdFramesLeft = 0;
+var noiseEstimate = -100;
+var noiseInitialized = false;
 
 function freqToMidi(freq) {
     return Math.round(12 * Math.log2(freq / 440) + 69);
@@ -151,14 +158,27 @@ function freqToMidi(freq) {
 
 function findPeaks(spec, sampleRate, fftSize) {
     var binWidth = sampleRate / fftSize;
+    var len = spec.length;
     var maxDb = -Infinity;
-    for (var i = 0; i < spec.length; i++) {
+    for (var i = 0; i < len; i++) {
         if (spec[i] > maxDb) maxDb = spec[i];
     }
-    var threshold = maxDb - 40;
+    if (maxDb < NOISE_FLOOR_DB) return [];
+    var sample = [];
+    for (var i = 0; i < len; i += 8) sample.push(spec[i]);
+    sample.sort(function(a, b) { return a - b; });
+    var medianDb = sample[Math.floor(sample.length / 2)];
+    var threshold = Math.max(maxDb - 40, medianDb + 25, NOISE_FLOOR_DB);
+    if (noiseInitialized) {
+        threshold = Math.max(threshold, noiseEstimate + 5);
+    }
     var peaks = [];
-    for (var i = 1; i < spec.length - 1; i++) {
-        if (spec[i] > threshold && spec[i] > spec[i - 1] && spec[i] > spec[i + 1]) {
+    for (var i = 2; i < len - 2; i++) {
+        if (spec[i] >= spec[i - 1] && spec[i] >= spec[i + 1] &&
+            spec[i] >= spec[i - 2] && spec[i] >= spec[i + 2] &&
+            spec[i] > threshold) {
+            var neighborMax = Math.max(spec[i - 1], spec[i + 1]);
+            if (spec[i] - neighborMax < 4) continue;
             var a = spec[i - 1], b = spec[i], c = spec[i + 1];
             var denom = a - 2 * b + c;
             var shift = denom !== 0 ? 0.5 * (a - c) / denom : 0;
@@ -283,57 +303,80 @@ function analyze() {
     }
     analyser.getFloatFrequencyData(spectrum);
 
-    var sampleRate = audioCtx.sampleRate;
-    var fftSize = analyser.fftSize;
-    var peaks = findPeaks(spectrum, sampleRate, fftSize);
+    var maxDb = -Infinity;
+    for (var i = 0; i < spectrum.length; i++) {
+        if (spectrum[i] > maxDb) maxDb = spectrum[i];
+    }
 
-    if (peaks.length === 0) {
-        silenceCount++;
-        if (silenceCount > 15 && activePitchClasses) {
+    if (!noiseInitialized) {
+        noiseEstimate = maxDb;
+        noiseInitialized = true;
+        return;
+    }
+
+    if (holdFramesLeft > 0) {
+        holdFramesLeft--;
+        if (maxDb > noiseEstimate + SUSTAIN_MARGIN_DB) {
+            holdFramesLeft = HOLD_FRAMES;
+        }
+        silenceCount = 0;
+
+        var sampleRate = audioCtx.sampleRate;
+        var fftSize = analyser.fftSize;
+        var peaks = findPeaks(spectrum, sampleRate, fftSize);
+        if (peaks.length === 0) return;
+
+        peaks = filterHarmonics(peaks);
+        var midiNotes = peaks.map(function(p) { return freqToMidi(p.freq); });
+        var stable = updateStability(midiNotes);
+
+        var stableKey = stable.join(',');
+        if (stableKey === lastStableKey) return;
+        lastStableKey = stableKey;
+
+        if (stable.length === 0) {
             activePitchClasses = null;
             activeMidiSet = null;
             activeChordName = null;
             clearHighlights();
             updateStatus(null, []);
-            lastStableKey = '';
+            return;
         }
-        return;
+
+        var pitchClasses = new Set();
+        stable.forEach(function(m) { pitchClasses.add(NOTES[m % 12]); });
+        var chordName = detectChord(stable);
+
+        activePitchClasses = pitchClasses;
+        activeMidiSet = new Set(stable);
+        activeChordName = chordName;
+
+        updateStatus(chordName, stable);
+        highlightFretboard(chordName, pitchClasses, activeMidiSet);
+    } else {
+        noiseEstimate = noiseEstimate * 0.95 + maxDb * 0.05;
+        if (maxDb > noiseEstimate + ONSET_MARGIN_DB && maxDb > NOISE_FLOOR_DB) {
+            holdFramesLeft = HOLD_FRAMES;
+            stabilityWindow = [];
+            lastStableKey = '';
+            silenceCount = 0;
+        } else {
+            silenceCount++;
+            if (silenceCount > 15 && activePitchClasses) {
+                activePitchClasses = null;
+                activeMidiSet = null;
+                activeChordName = null;
+                clearHighlights();
+                updateStatus(null, []);
+                lastStableKey = '';
+            }
+        }
     }
-    silenceCount = 0;
-
-    peaks = filterHarmonics(peaks);
-    var midiNotes = peaks.map(function(p) { return freqToMidi(p.freq); });
-    var stable = updateStability(midiNotes);
-
-    var stableKey = stable.join(',');
-    if (stableKey === lastStableKey) return;
-    lastStableKey = stableKey;
-
-    if (stable.length === 0) {
-        activePitchClasses = null;
-        activeMidiSet = null;
-        activeChordName = null;
-        clearHighlights();
-        updateStatus(null, []);
-        return;
-    }
-
-    var pitchClasses = new Set();
-    stable.forEach(function(m) { pitchClasses.add(NOTES[m % 12]); });
-
-    var chordName = detectChord(stable);
-
-    activePitchClasses = pitchClasses;
-    activeMidiSet = new Set(stable);
-    activeChordName = chordName;
-
-    updateStatus(chordName, stable);
-    highlightFretboard(chordName, pitchClasses, activeMidiSet);
 }
 
 function startListening() {
     navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false }
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     }).then(function(stream) {
         mediaStream = stream;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -353,6 +396,9 @@ function startListening() {
         activePitchClasses = null;
         activeMidiSet = null;
         activeChordName = null;
+        holdFramesLeft = 0;
+        noiseEstimate = -100;
+        noiseInitialized = false;
 
         intervalId = setInterval(analyze, 100);
     }).catch(function(err) {
@@ -381,6 +427,9 @@ function stopListening() {
     stabilityWindow = [];
     silenceCount = 0;
     lastStableKey = '';
+    holdFramesLeft = 0;
+    noiseEstimate = -100;
+    noiseInitialized = false;
 }
 
 function initListen() {
