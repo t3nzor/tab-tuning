@@ -277,3 +277,42 @@ select {
     color: #fff;
     box-shadow: 0 0 0 2px #1f6e4e;
 }
+
+.matches-row {
+    max-width: 900px;
+    margin: 0 auto 2rem;
+}
+
+#matches-label {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 0.5rem;
+    min-height: 1.1rem;
+}
+
+#matches-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.match-chip {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    padding: 0.25rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.match-chip:hover {
+    background: #1f3060;
+    border-color: #666;
+}
+
+.match-chip.active {
+    border-color: #3e8e6e;
+    background: #1f3060;
+}

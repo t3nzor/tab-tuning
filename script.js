@@ -141,20 +141,20 @@ var CHORD_TYPES = [
 ];
 
 var SCALE_TYPES = [
-    { name: 'major', label: 'Major (Ionian)' },
-    { name: 'minor', label: 'Minor (Aeolian)' },
-    { name: 'dorian', label: 'Dorian' },
-    { name: 'phrygian', label: 'Phrygian' },
-    { name: 'lydian', label: 'Lydian' },
-    { name: 'mixolydian', label: 'Mixolydian' },
-    { name: 'locrian', label: 'Locrian' },
-    { name: 'major pentatonic', label: 'Major Pentatonic' },
-    { name: 'minor pentatonic', label: 'Minor Pentatonic' },
-    { name: 'minor blues', label: 'Blues' },
-    { name: 'major blues', label: 'Major Blues' },
-    { name: 'harmonic minor', label: 'Harmonic Minor' },
-    { name: 'melodic minor', label: 'Melodic Minor' },
-    { name: 'harmonic major', label: 'Harmonic Major' },
+    { name: 'major', label: 'Major (Ionian)', short: 'Major' },
+    { name: 'minor', label: 'Minor (Aeolian)', short: 'Minor' },
+    { name: 'dorian', label: 'Dorian', short: 'Dorian' },
+    { name: 'phrygian', label: 'Phrygian', short: 'Phrygian' },
+    { name: 'lydian', label: 'Lydian', short: 'Lydian' },
+    { name: 'mixolydian', label: 'Mixolydian', short: 'Mixolydian' },
+    { name: 'locrian', label: 'Locrian', short: 'Locrian' },
+    { name: 'major pentatonic', label: 'Major Pentatonic', short: 'Maj Pent' },
+    { name: 'minor pentatonic', label: 'Minor Pentatonic', short: 'Min Pent' },
+    { name: 'minor blues', label: 'Blues', short: 'Blues' },
+    { name: 'major blues', label: 'Major Blues', short: 'Maj Blues' },
+    { name: 'harmonic minor', label: 'Harmonic Minor', short: 'Harm Minor' },
+    { name: 'melodic minor', label: 'Melodic Minor', short: 'Mel Minor' },
+    { name: 'harmonic major', label: 'Harmonic Major', short: 'Harm Major' },
 ];
 
 function toSharp(note) {
@@ -204,6 +204,7 @@ function applyChord(symbol) {
         activeChord = null;
         clearHighlights();
         displayChord(null, null);
+        renderScaleMatches();
         return;
     }
     if (!hasTonal) {
@@ -211,6 +212,7 @@ function applyChord(symbol) {
         activeChord = null;
         clearHighlights();
         displayChord(null, null);
+        renderScaleMatches();
         return;
     }
     var chord = Tonal.Chord.get(symbol.trim());
@@ -219,6 +221,7 @@ function applyChord(symbol) {
         activeChord = null;
         clearHighlights();
         displayChord(null, null);
+        renderScaleMatches();
         return;
     }
     input.classList.remove('invalid');
@@ -233,6 +236,7 @@ function applyChord(symbol) {
     if (typeEntry) {
         document.getElementById('chord-type').value = chord.type;
     }
+    renderScaleMatches();
 }
 
 function applyScale(root, typeName) {
@@ -240,12 +244,14 @@ function applyScale(root, typeName) {
         activeScale = null;
         displayScale(null, null);
         highlightAll();
+        renderScaleMatches();
         return;
     }
     if (!hasTonal) {
         activeScale = null;
         displayScale(null, null);
         highlightAll();
+        renderScaleMatches();
         return;
     }
     var scale = Tonal.Scale.get(root + ' ' + typeName);
@@ -253,6 +259,7 @@ function applyScale(root, typeName) {
         activeScale = null;
         displayScale(null, null);
         highlightAll();
+        renderScaleMatches();
         return;
     }
     var tonic = toSharp(scale.tonic);
@@ -262,6 +269,57 @@ function applyScale(root, typeName) {
     activeScale = { notes: notesSet, tonic: tonic, label: label };
     displayScale(label, notes);
     highlightAll();
+    renderScaleMatches();
+}
+
+function findScalesForChord(chordNotesSet) {
+    var results = [];
+    var tonic = activeChord ? activeChord.tonic : null;
+    var roots = NOTES.slice();
+    if (tonic) {
+        var idx = NOTES.indexOf(tonic);
+        roots = NOTES.slice(idx).concat(NOTES.slice(0, idx));
+    }
+    roots.forEach(function(root) {
+        SCALE_TYPES.forEach(function(t) {
+            var scale = Tonal.Scale.get(root + ' ' + t.name);
+            if (scale.empty) return;
+            var scaleSet = new Set(scale.notes.map(toSharp));
+            var containsAll = true;
+            chordNotesSet.forEach(function(n) { if (!scaleSet.has(n)) containsAll = false; });
+            if (containsAll) results.push({ root: root, type: t.name, label: root + ' ' + t.short });
+        });
+    });
+    return results;
+}
+
+function renderScaleMatches() {
+    var labelEl = document.getElementById('matches-label');
+    var listEl = document.getElementById('matches-list');
+    if (!activeChord) {
+        labelEl.textContent = '';
+        listEl.innerHTML = '';
+        return;
+    }
+    var matches = findScalesForChord(activeChord.notes);
+    labelEl.textContent = activeChord.label + ' appears in ' + matches.length + ' scale' + (matches.length !== 1 ? 's' : '') + ':';
+    var html = '';
+    matches.forEach(function(m) {
+        var isActive = activeScale && activeScale.tonic === m.root && activeScale.label.indexOf(m.type) !== -1;
+        html += '<button class="match-chip' + (isActive ? ' active' : '') + '" data-root="' + m.root + '" data-type="' + m.type + '">' + m.label + '</button>';
+    });
+    listEl.innerHTML = html;
+    var chips = listEl.querySelectorAll('.match-chip');
+    for (var i = 0; i < chips.length; i++) {
+        chips[i].addEventListener('click', function() {
+            var root = this.getAttribute('data-root');
+            var type = this.getAttribute('data-type');
+            document.getElementById('scale-root').value = root;
+            document.getElementById('scale-type').value = type;
+            applyScale(root, type);
+            renderScaleMatches();
+        });
+    }
 }
 
 function initChordControls() {
