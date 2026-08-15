@@ -64,10 +64,7 @@ function renderFretboard() {
     }
 
     fretboard.innerHTML = html;
-
-    if (activeChord) {
-        highlightChord(activeChord);
-    }
+    highlightAll();
 }
 
 // ---- Presets ----
@@ -118,6 +115,7 @@ function applyPreset(preset) {
 
 var hasTonal = typeof Tonal !== 'undefined' && Tonal.Chord;
 var activeChord = null;
+var activeScale = null;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -142,6 +140,23 @@ var CHORD_TYPES = [
     { name: 'fifth', label: '5', symbol: '5' },
 ];
 
+var SCALE_TYPES = [
+    { name: 'major', label: 'Major (Ionian)' },
+    { name: 'minor', label: 'Minor (Aeolian)' },
+    { name: 'dorian', label: 'Dorian' },
+    { name: 'phrygian', label: 'Phrygian' },
+    { name: 'lydian', label: 'Lydian' },
+    { name: 'mixolydian', label: 'Mixolydian' },
+    { name: 'locrian', label: 'Locrian' },
+    { name: 'major pentatonic', label: 'Major Pentatonic' },
+    { name: 'minor pentatonic', label: 'Minor Pentatonic' },
+    { name: 'minor blues', label: 'Blues' },
+    { name: 'major blues', label: 'Major Blues' },
+    { name: 'harmonic minor', label: 'Harmonic Minor' },
+    { name: 'melodic minor', label: 'Melodic Minor' },
+    { name: 'harmonic major', label: 'Harmonic Major' },
+];
+
 function toSharp(note) {
     var s = Tonal.Note.simplify(note);
     if (s.indexOf('b') !== -1) {
@@ -155,18 +170,22 @@ function displayChord(label, notes) {
     document.getElementById('detected-notes').textContent = notes ? notes.join(' ') : '';
 }
 
-function highlightChord(chord) {
+function displayScale(label, notes) {
+    document.getElementById('scale-name').textContent = label || '';
+    document.getElementById('scale-notes').textContent = notes ? notes.join(' ') : '';
+}
+
+function highlightAll() {
     var notes = document.querySelectorAll('.fretboard .note');
     for (var i = 0; i < notes.length; i++) {
         var el = notes[i];
         var pc = el.getAttribute('data-note');
-        el.classList.remove('chord-tone', 'chord-root');
-        if (chord.notes.has(pc)) {
-            if (pc === chord.tonic) {
-                el.classList.add('chord-root');
-            } else {
-                el.classList.add('chord-tone');
-            }
+        el.classList.remove('chord-tone', 'chord-root', 'scale-tone', 'scale-root');
+        if (activeScale && activeScale.notes.has(pc)) {
+            el.classList.add(pc === activeScale.tonic ? 'scale-root' : 'scale-tone');
+        }
+        if (activeChord && activeChord.notes.has(pc)) {
+            el.classList.add(pc === activeChord.tonic ? 'chord-root' : 'chord-tone');
         }
     }
 }
@@ -174,7 +193,7 @@ function highlightChord(chord) {
 function clearHighlights() {
     var notes = document.querySelectorAll('.fretboard .note');
     for (var i = 0; i < notes.length; i++) {
-        notes[i].classList.remove('chord-tone', 'chord-root');
+        notes[i].classList.remove('chord-tone', 'chord-root', 'scale-tone', 'scale-root');
     }
 }
 
@@ -208,12 +227,41 @@ function applyChord(symbol) {
     var notesSet = new Set(notes);
     activeChord = { notes: notesSet, tonic: tonic, label: symbol.trim() };
     displayChord(symbol.trim(), notes);
-    highlightChord(activeChord);
+    highlightAll();
     document.getElementById('chord-root').value = tonic;
     var typeEntry = CHORD_TYPES.find(function(t) { return t.name === chord.type; });
     if (typeEntry) {
         document.getElementById('chord-type').value = chord.type;
     }
+}
+
+function applyScale(root, typeName) {
+    if (!typeName) {
+        activeScale = null;
+        displayScale(null, null);
+        highlightAll();
+        return;
+    }
+    if (!hasTonal) {
+        activeScale = null;
+        displayScale(null, null);
+        highlightAll();
+        return;
+    }
+    var scale = Tonal.Scale.get(root + ' ' + typeName);
+    if (scale.empty || !scale.tonic) {
+        activeScale = null;
+        displayScale(null, null);
+        highlightAll();
+        return;
+    }
+    var tonic = toSharp(scale.tonic);
+    var notes = scale.notes.map(toSharp);
+    var notesSet = new Set(notes);
+    var label = tonic + ' ' + typeName;
+    activeScale = { notes: notesSet, tonic: tonic, label: label };
+    displayScale(label, notes);
+    highlightAll();
 }
 
 function initChordControls() {
@@ -257,12 +305,44 @@ function initChordControls() {
     applyChord('C');
 }
 
+function initScaleControls() {
+    var rootSelect = document.getElementById('scale-root');
+    NOTES.forEach(function(note) {
+        var option = document.createElement('option');
+        option.value = note;
+        option.textContent = note;
+        rootSelect.appendChild(option);
+    });
+
+    var typeSelect = document.getElementById('scale-type');
+    var noneOption = document.createElement('option');
+    noneOption.value = '';
+    noneOption.textContent = 'None';
+    typeSelect.appendChild(noneOption);
+    SCALE_TYPES.forEach(function(t) {
+        var option = document.createElement('option');
+        option.value = t.name;
+        option.textContent = t.label;
+        typeSelect.appendChild(option);
+    });
+
+    rootSelect.addEventListener('change', function() {
+        applyScale(rootSelect.value, typeSelect.value);
+    });
+    typeSelect.addEventListener('change', function() {
+        applyScale(rootSelect.value, typeSelect.value);
+    });
+
+    rootSelect.value = 'C';
+}
+
 // ---- Init ----
 
 document.addEventListener('DOMContentLoaded', function() {
     initPresetSelect();
     initStringSelects();
     initChordControls();
+    initScaleControls();
 
     var presetSelect = document.getElementById('preset');
     presetSelect.addEventListener('change', function() {

@@ -181,3 +181,99 @@ select {
     background: #e85d04;
     color: #fff;
 }
+
+.scale-row {
+    max-width: 900px;
+    margin: 0 auto 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.scale-display {
+    flex: 1;
+}
+
+#scale-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    min-height: 1.5rem;
+}
+
+#scale-notes {
+    font-size: 0.85rem;
+    color: #888;
+    min-height: 1rem;
+}
+
+.note.scale-tone {
+    background: #3e8e6e;
+    color: #fff;
+}
+
+.note.scale-root {
+    background: #1f6e4e;
+    color: #fff;
+    font-weight: 700;
+}
+
+.note.scale-tone.chord-tone {
+    background: #d4a017;
+    color: #1a1a2e;
+    box-shadow: 0 0 0 2px #3e8e6e;
+}
+
+.note.scale-root.chord-tone {
+    background: #d4a017;
+    color: #1a1a2e;
+    box-shadow: 0 0 0 2px #1f6e4e;
+}
+
+.note.scale-tone.chord-root {
+    background: #e85d04;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px #3e8e6e;
+}
+
+.note.scale-root.chord-root {
+    background: #e85d04;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px #1f6e4e;
+}
+
+.cell.nut .note.scale-tone {
+    background: #3e8e6e;
+    color: #fff;
+}
+
+.cell.nut .note.scale-root {
+    background: #1f6e4e;
+    color: #fff;
+}
+
+.cell.nut .note.scale-tone.chord-tone {
+    background: #d4a017;
+    color: #1a1a2e;
+    box-shadow: 0 0 0 2px #3e8e6e;
+}
+
+.cell.nut .note.scale-root.chord-tone {
+    background: #d4a017;
+    color: #1a1a2e;
+    box-shadow: 0 0 0 2px #1f6e4e;
+}
+
+.cell.nut .note.scale-tone.chord-root {
+    background: #e85d04;
+    color: #fff;
+    box-shadow: 0 0 0 2px #3e8e6e;
+}
+
+.cell.nut .note.scale-root.chord-root {
+    background: #e85d04;
+    color: #fff;
+    box-shadow: 0 0 0 2px #1f6e4e;
+}
