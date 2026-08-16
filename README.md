@@ -9,6 +9,8 @@ An interactive guitar fretboard note chart with chord and scale pickers, in the 
 - **Chord picker** — type any chord symbol (`Cmaj7`, `Am`, `G7`…) or build one from root + chord-type dropdowns (20 common types: major, minor, 7, maj7, m7, dim, aug, sus2, sus4, and more)
 - **Scale/mode picker** — pick a root note + scale type (14 scales: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Major/Minor Pentatonic, Blues, Major Blues, Harmonic Minor, Melodic Minor, Harmonic Major). Defaults to None
 - **Dual highlighting** — chord tones glow amber (root: orange); scale tones glow green (root: deep green). Notes in both get a green ring. Both layers update automatically when you switch tunings
+- **Chord visibility toggle** — uncheck the **Chord** box to hide the chord's fretboard highlighting while keeping its name and scale matches visible, so you can study a scale on its own
+- **Chord–scale compatibility** — for any active chord, a chip list shows every scale (of the 14 types × 12 roots) that contains all the chord's notes. Click a chip to light that scale up on the fretboard
 
 ## Running locally
 
@@ -25,7 +27,9 @@ Then open `http://localhost:8000`. [Tonal](https://github.com/tonaljs/tonal) loa
 1. Pick a tuning preset from the dropdown, or tweak any string to switch to a custom tuning
 2. Type a chord symbol in the text field (e.g. `Am7`, `G/B`, `F#dim`), or pick a root note and chord type from the two dropdowns — the text field and dropdowns stay in sync
 3. Pick a scale root and type from the Scale row (or leave it on None). Chord and scale highlights are active simultaneously — notes that belong to both get a green ring
-4. Invalid chord text shows a red border and clears the chord; switching tuning preserves both highlights
+4. The chip list below the scale row shows every scale the current chord appears in; click one to preview it. The currently-selected scale's chip is outlined in green
+5. Uncheck the **Chord** box to view the scale's notes without the chord's amber/orange highlights (the chord itself stays selected)
+6. Invalid chord text shows a red border and clears the chord; switching tuning preserves both highlights
 
 ## Tech
 
