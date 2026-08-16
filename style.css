@@ -149,6 +149,16 @@ select {
     flex: 1;
 }
 
+.show-chord {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: #d4a017;
+}
+
 #chord-name {
     font-size: 1.5rem;
     font-weight: 700;

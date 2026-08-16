@@ -116,6 +116,7 @@ function applyPreset(preset) {
 var hasTonal = typeof Tonal !== 'undefined' && Tonal.Chord;
 var activeChord = null;
 var activeScale = null;
+var showChord = true;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -184,7 +185,7 @@ function highlightAll() {
         if (activeScale && activeScale.notes.has(pc)) {
             el.classList.add(pc === activeScale.tonic ? 'scale-root' : 'scale-tone');
         }
-        if (activeChord && activeChord.notes.has(pc)) {
+        if (showChord && activeChord && activeChord.notes.has(pc)) {
             el.classList.add(pc === activeChord.tonic ? 'chord-root' : 'chord-tone');
         }
     }
@@ -356,6 +357,11 @@ function initChordControls() {
 
     rootSelect.addEventListener('change', onSelectChange);
     typeSelect.addEventListener('change', onSelectChange);
+
+    document.getElementById('show-chord').addEventListener('change', function() {
+        showChord = this.checked;
+        highlightAll();
+    });
 
     rootSelect.value = 'C';
     typeSelect.value = 'major';
