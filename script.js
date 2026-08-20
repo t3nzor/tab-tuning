@@ -49,9 +49,13 @@ function renderFretboard() {
         var openNote = tuning[s];
         for (var f = 0; f <= 12; f++) {
             var note = noteAt(openNote, f);
+            var text = note;
+            if (showIntervals && activeScale) {
+                text = getIntervalName(activeScale.tonic, note);
+            }
             var classes = ['cell'];
             if (f === 0) classes.push('nut');
-            html += '<div class="' + classes.join(' ') + '"><span class="note" data-note="' + note + '">' + note + '</span></div>';
+            html += '<div class="' + classes.join(' ') + '"><span class="note" data-note="' + note + '">' + text + '</span></div>';
         }
     }
 
@@ -117,6 +121,7 @@ var hasTonal = typeof Tonal !== 'undefined' && Tonal.Chord;
 var activeChord = null;
 var activeScale = null;
 var showChord = true;
+var showIntervals = false;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -164,6 +169,15 @@ function toSharp(note) {
         s = Tonal.Note.enharmonic(s);
     }
     return s;
+}
+
+var INTERVAL_NAMES = ['P1', 'm2', 'M2', 'm3', 'M3', 'P4', 'A4', 'P5', 'm6', 'M6', 'm7', 'M7'];
+
+function getIntervalName(root, note) {
+    var rootIdx = NOTES.indexOf(root);
+    var noteIdx = NOTES.indexOf(note);
+    var semitones = (noteIdx - rootIdx + 12) % 12;
+    return INTERVAL_NAMES[semitones];
 }
 
 function displayChord(label, notes) {
@@ -244,14 +258,14 @@ function applyScale(root, typeName) {
     if (!typeName) {
         activeScale = null;
         displayScale(null, null);
-        highlightAll();
+        renderFretboard();
         renderScaleMatches();
         return;
     }
     if (!hasTonal) {
         activeScale = null;
         displayScale(null, null);
-        highlightAll();
+        renderFretboard();
         renderScaleMatches();
         return;
     }
@@ -259,7 +273,7 @@ function applyScale(root, typeName) {
     if (scale.empty || !scale.tonic) {
         activeScale = null;
         displayScale(null, null);
-        highlightAll();
+        renderFretboard();
         renderScaleMatches();
         return;
     }
@@ -269,7 +283,7 @@ function applyScale(root, typeName) {
     var label = tonic + ' ' + typeName;
     activeScale = { notes: notesSet, tonic: tonic, label: label, type: typeName };
     displayScale(label, notes);
-    highlightAll();
+    renderFretboard();
     renderScaleMatches();
 }
 
@@ -395,6 +409,11 @@ function initScaleControls() {
     });
     typeSelect.addEventListener('change', function() {
         applyScale(rootSelect.value, typeSelect.value);
+    });
+
+    document.getElementById('show-intervals').addEventListener('change', function() {
+        showIntervals = this.checked;
+        renderFretboard();
     });
 
     rootSelect.value = 'C';
