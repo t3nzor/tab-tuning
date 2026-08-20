@@ -50,8 +50,9 @@ function renderFretboard() {
         for (var f = 0; f <= 12; f++) {
             var note = noteAt(openNote, f);
             var text = note;
-            if (showIntervals && activeScale) {
-                text = getIntervalName(activeScale.tonic, note);
+            if (showIntervals) {
+                var ref = activeScale ? activeScale.tonic : document.getElementById('scale-root').value;
+                if (ref) text = getIntervalName(ref, note);
             }
             var classes = ['cell'];
             if (f === 0) classes.push('nut');
