@@ -318,7 +318,7 @@ function renderScaleMatches() {
         return;
     }
     var matches = findScalesForChord(activeChord.notes);
-    labelEl.textContent = activeChord.label + ' appears in ' + matches.length + ' scale' + (matches.length !== 1 ? 's' : '') + ':';
+    labelEl.innerHTML = '<strong>' + activeChord.label + '</strong> appears in ' + matches.length + ' scale' + (matches.length !== 1 ? 's' : '') + ':';
     var html = '';
     matches.forEach(function(m) {
         var isActive = activeScale && activeScale.tonic === m.root && activeScale.type === m.type;
