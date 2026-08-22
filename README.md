@@ -22,6 +22,15 @@ python3 -m http.server 8000
 
 Then open `http://localhost:8000`. [Tonal](https://github.com/tonaljs/tonal) loads from a jsDelivr CDN script tag — an internet connection is required for chord parsing.
 
+## Testing
+
+Install the development dependencies and run the browser integration tests:
+
+```bash
+npm install
+npm test
+```
+
 ## Usage
 
 1. Pick a tuning preset from the dropdown, or tweak any string to switch to a custom tuning

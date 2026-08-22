@@ -172,6 +172,12 @@ function toSharp(note) {
     return s;
 }
 
+function formatScaleName(typeName) {
+    return typeName.replace(/\b\w/g, function(letter) {
+        return letter.toUpperCase();
+    });
+}
+
 var INTERVAL_NAMES = ['P1', 'm2', 'M2', 'm3', 'M3', 'P4', 'A4', 'P5', 'm6', 'M6', 'm7', 'M7'];
 
 function getIntervalName(root, note) {
@@ -279,11 +285,11 @@ function applyScale(root, typeName) {
         return;
     }
     var tonic = toSharp(scale.tonic);
-    var notes = scale.notes.map(toSharp);
-    var notesSet = new Set(notes);
-    var label = tonic + ' ' + typeName;
+    var displayNotes = scale.notes;
+    var notesSet = new Set(displayNotes.map(toSharp));
+    var label = tonic + ' ' + formatScaleName(typeName);
     activeScale = { notes: notesSet, tonic: tonic, label: label, type: typeName };
-    displayScale(label, notes);
+    displayScale(label, displayNotes);
     renderFretboard();
     renderScaleMatches();
 }
