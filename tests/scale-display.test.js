@@ -50,7 +50,7 @@ test('initializes the standard fretboard and default C chord', () => {
     assert.equal(document.getElementById('preset').value, 'standard');
     assert.equal(document.querySelectorAll('#tuning-selects select').length, 6);
     assert.equal(document.querySelectorAll('#tuning-selects option').length, 72);
-    assert.equal(document.querySelectorAll('.fretboard .note').length, 78);
+    assert.equal(document.querySelectorAll('.fretboard .note').length, 114);
     assert.equal(document.getElementById('chord-name').textContent, 'C');
     assert.equal(document.getElementById('scale-type').value, '');
     assert.ok(document.querySelector('.note[data-note="C"]').classList.contains('chord-root'));

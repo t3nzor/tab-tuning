@@ -1,3 +1,5 @@
+const NUM_FRETS = 18;
+
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 const TUNINGS = {
@@ -47,7 +49,7 @@ function renderFretboard() {
 
     for (var s = 5; s >= 0; s--) {
         var openNote = tuning[s];
-        for (var f = 0; f <= 12; f++) {
+        for (var f = 0; f <= NUM_FRETS; f++) {
             var note = noteAt(openNote, f);
             var text = note;
             if (showIntervals) {
@@ -60,8 +62,8 @@ function renderFretboard() {
         }
     }
 
-    for (var f = 0; f <= 12; f++) {
-        var dots = [3, 5, 7, 9].includes(f) ? 1 : f === 12 ? 2 : 0;
+    for (var f = 0; f <= NUM_FRETS; f++) {
+        var dots = [3, 5, 7, 9, 15, 17].includes(f) ? 1 : (f !== 0 && f % 12 === 0) ? 2 : 0;
         var dotHtml = '';
         if (dots === 1) dotHtml = '<span class="dot"></span>';
         else if (dots === 2) dotHtml = '<span class="dot"></span><span class="dot"></span>';
@@ -69,6 +71,7 @@ function renderFretboard() {
     }
 
     fretboard.innerHTML = html;
+    fretboard.style.gridTemplateColumns = 'repeat(' + (NUM_FRETS + 1) + ', minmax(2.5rem, 1fr))';
     highlightAll();
 }
 

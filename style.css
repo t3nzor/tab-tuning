@@ -54,18 +54,18 @@ select {
 }
 
 .fretboard-wrapper {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 0 auto;
     overflow-x: auto;
 }
 
 .fretboard {
     display: grid;
-    grid-template-columns: repeat(13, minmax(3rem, 1fr));
+    grid-template-columns: repeat(19, minmax(2.5rem, 1fr));
     background: #b8945a;
     border-radius: 6px;
     padding: 0.5rem 0;
-    min-width: 42rem;
+    min-width: 48rem;
 }
 
 .cell {
