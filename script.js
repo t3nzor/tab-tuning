@@ -11,7 +11,7 @@ const TUNINGS = {
     openG:     ['D', 'G', 'D', 'G', 'B', 'D'],
     openD:     ['D', 'A', 'D', 'F#', 'A', 'D'],
     perfect4ths: ['E', 'A', 'D', 'G', 'C', 'F'],
-    majorThirds: ['F#', 'A#', 'D', 'F#', 'A#', 'D'],
+    majorThirds: ['F', 'A', 'C#', 'F', 'A', 'C#'],
 };
 
 const PRESET_LABELS = {
@@ -23,7 +23,7 @@ const PRESET_LABELS = {
     openG: 'Open G (D G D G B D)',
     openD: 'Open D (D A D F# A D)',
     perfect4ths: 'Perfect 4ths (E A D G C F)',
-    majorThirds: 'Major Thirds (F# A# D F# A# D)',
+    majorThirds: 'Major Thirds (F A C# F A C#)',
     custom: 'Custom',
 };
 
@@ -63,11 +63,16 @@ function renderFretboard() {
     }
 
     for (var f = 0; f <= NUM_FRETS; f++) {
-        var dots = [3, 5, 7, 9, 15, 17].includes(f) ? 1 : (f !== 0 && f % 12 === 0) ? 2 : 0;
-        var dotHtml = '';
-        if (dots === 1) dotHtml = '<span class="dot"></span>';
-        else if (dots === 2) dotHtml = '<span class="dot"></span><span class="dot"></span>';
-        html += '<div class="fret-num">' + f + dotHtml + '</div>';
+        var markerHtml = '';
+        if (showStickers) {
+            var colors = ['white', 'red', 'green', 'blue'];
+            markerHtml = '<span class="sticker ' + colors[f % 4] + '"></span>';
+        } else {
+            var dots = [3, 5, 7, 9, 15, 17].includes(f) ? 1 : (f !== 0 && f % 12 === 0) ? 2 : 0;
+            if (dots === 1) markerHtml = '<span class="dot"></span>';
+            else if (dots === 2) markerHtml = '<span class="dot"></span><span class="dot"></span>';
+        }
+        html += '<div class="fret-num">' + f + markerHtml + '</div>';
     }
 
     fretboard.innerHTML = html;
@@ -126,6 +131,7 @@ var activeChord = null;
 var activeScale = null;
 var showChord = true;
 var showIntervals = false;
+var showStickers = true;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -443,7 +449,12 @@ document.addEventListener('DOMContentLoaded', function() {
         renderFretboard();
     });
 
-    applyPreset('standard');
-    presetSelect.value = 'standard';
+    applyPreset('majorThirds');
+    presetSelect.value = 'majorThirds';
     renderFretboard();
+
+    document.getElementById('show-stickers').addEventListener('change', function() {
+        showStickers = this.checked;
+        renderFretboard();
+    });
 });

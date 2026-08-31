@@ -5,6 +5,7 @@ An interactive guitar fretboard note chart with chord and scale pickers, in the 
 ## Features
 
 - **18-fret fretboard** showing every note, tablature-style (high string on top)
+- **Switchable fretboard markers** — colored sticker cycle (white at the nut, then red/green/blue repeating every 4 frets — matches the repeating major-thirds pattern) by default, or standard inlay dots (3/5/7/9/15/17, double at 12) via the checkbox below the board
 - **9 tuning presets** — Standard, Drop D, Half-Step Down, Drop C, DADGAD, Open G, Open D, Perfect 4ths, Major Thirds — plus fully custom per-string tuning
 - **Chord picker** — type any chord symbol (`Cmaj7`, `Am`, `G7`…) or build one from root + chord-type dropdowns (20 common types: major, minor, 7, maj7, m7, dim, aug, sus2, sus4, and more)
 - **Scale/mode picker** — pick a root note + scale type (14 scales: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Major/Minor Pentatonic, Blues, Major Blues, Harmonic Minor, Melodic Minor, Harmonic Major). Defaults to None

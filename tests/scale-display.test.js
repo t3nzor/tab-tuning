@@ -43,17 +43,53 @@ function inputValue(dom, value) {
     return input;
 }
 
-test('initializes the standard fretboard and default C chord', () => {
+test('initializes the fretboard with the default major-thirds tuning and default C chord', () => {
     const dom = createApp();
     const document = dom.window.document;
 
-    assert.equal(document.getElementById('preset').value, 'standard');
+    assert.equal(document.getElementById('preset').value, 'majorThirds');
+    assert.equal(document.getElementById('string6').value, 'F');
+    assert.equal(document.getElementById('string1').value, 'C#');
     assert.equal(document.querySelectorAll('#tuning-selects select').length, 6);
     assert.equal(document.querySelectorAll('#tuning-selects option').length, 72);
     assert.equal(document.querySelectorAll('.fretboard .note').length, 114);
     assert.equal(document.getElementById('chord-name').textContent, 'C');
     assert.equal(document.getElementById('scale-type').value, '');
     assert.ok(document.querySelector('.note[data-note="C"]').classList.contains('chord-root'));
+
+    const stickers = document.querySelectorAll('.fret-num .sticker');
+    assert.equal(stickers.length, 19);
+    const expected = ['white', 'red', 'green', 'blue'];
+    for (let f = 0; f <= 18; f++) {
+        assert.ok(stickers[f].classList.contains(expected[f % 4]), 'fret ' + f + ' sticker color');
+    }
+
+    dom.window.close();
+});
+
+test('toggles between colored stickers and standard inlay dots', () => {
+    const dom = createApp();
+    const document = dom.window.document;
+
+    const showStickers = document.getElementById('show-stickers');
+    showStickers.checked = false;
+    showStickers.dispatchEvent(new dom.window.Event('change'));
+
+    assert.equal(document.querySelectorAll('.fret-num .sticker').length, 0);
+    const dotCells = document.querySelectorAll('.fret-num');
+    assert.equal(document.querySelectorAll('.fret-num .dot').length, 8);
+    [3, 5, 7, 9, 15, 17].forEach((f) => {
+        assert.equal(dotCells[f].querySelectorAll('.dot').length, 1, 'single dot at fret ' + f);
+    });
+    assert.equal(dotCells[12].querySelectorAll('.dot').length, 2, 'double dot at fret 12');
+    [0, 1, 2, 4, 6, 8, 10, 11, 13, 14, 16, 18].forEach((f) => {
+        assert.equal(dotCells[f].querySelectorAll('.dot').length, 0, 'no dot at fret ' + f);
+    });
+
+    showStickers.checked = true;
+    showStickers.dispatchEvent(new dom.window.Event('change'));
+    assert.equal(document.querySelectorAll('.fret-num .dot').length, 0);
+    assert.equal(document.querySelectorAll('.fret-num .sticker').length, 19);
 
     dom.window.close();
 });

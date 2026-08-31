@@ -118,6 +118,34 @@ select {
     margin-top: 0.15rem;
 }
 
+.sticker {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    margin-top: 0.15rem;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.sticker.white { background: #f0e6d0; }
+.sticker.red { background: #c0392b; }
+.sticker.green { background: #3e8e6e; }
+.sticker.blue { background: #4a6fa5; }
+
+.markers-toggle-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 0.75rem;
+}
+
+.show-stickers {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    accent-color: #d4a017;
+}
+
 .chord-row {
     max-width: 900px;
     margin: 0 auto 2rem;
