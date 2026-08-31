@@ -9,6 +9,7 @@ An interactive guitar fretboard note chart with chord and scale pickers, in the 
 - **9 tuning presets** — Standard, Drop D, Half-Step Down, Drop C, DADGAD, Open G, Open D, Perfect 4ths, Major Thirds — plus fully custom per-string tuning
 - **Chord picker** — type any chord symbol (`Cmaj7`, `Am`, `G7`…) or build one from root + chord-type dropdowns (20 common types: major, minor, 7, maj7, m7, dim, aug, sus2, sus4, and more)
 - **Scale/mode picker** — pick a root note + scale type (14 scales: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Major/Minor Pentatonic, Blues, Major Blues, Harmonic Minor, Melodic Minor, Harmonic Major). Defaults to None
+- **Diatonic chord buttons** — for any active scale, the row below shows its diatonic triads (`I · C`, `ii · Dm`, `vii° · Bdim`…) as clickable chips; click one to light that chord up as the active chord. Pentatonic and blues scales use the triads of their parent major/minor scale (same tonic), numbered per the parent
 - **Dual highlighting** — chord tones glow amber (root: orange); scale tones glow green (root: deep green). Notes in both get a green ring. Both layers update automatically when you switch tunings
 - **Chord visibility toggle** — uncheck the **Chord** box to hide the chord's fretboard highlighting while keeping its name and scale matches visible, so you can study a scale on its own
 - **Chord–scale compatibility** — for any active chord, a chip list shows every scale (of the 14 types × 12 roots) that contains all the chord's notes. Click a chip to light that scale up on the fretboard

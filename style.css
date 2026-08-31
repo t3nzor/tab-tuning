@@ -331,14 +331,16 @@ select {
     margin: 0 auto 2rem;
 }
 
-#matches-label {
+#matches-label,
+#diatonic-label {
     font-size: 0.85rem;
     color: #888;
     margin-bottom: 0.5rem;
     min-height: 1.1rem;
 }
 
-#matches-list {
+#matches-list,
+#diatonic-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;

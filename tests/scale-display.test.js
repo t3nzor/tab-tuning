@@ -233,3 +233,51 @@ test('sharp-key scales retain necessary letter spellings', () => {
 
     dom.window.close();
 });
+
+test('shows clickable diatonic chords for the active scale', () => {
+    const dom = createApp();
+    const document = dom.window.document;
+
+    assert.equal(document.querySelectorAll('#diatonic-list .match-chip').length, 0);
+
+    selectScale(dom, 'C', 'major');
+    const buttons = [...document.querySelectorAll('#diatonic-list .match-chip')];
+    assert.equal(buttons.length, 7);
+    const expected = ['I · C', 'ii · Dm', 'iii · Em', 'IV · F', 'V · G', 'vi · Am', 'vii° · Bdim'];
+    expected.forEach((label, i) => assert.equal(buttons[i].textContent, label));
+    assert.equal(document.getElementById('diatonic-label').textContent, 'Diatonic chords in C Major:');
+
+    buttons[1].click();
+    assert.equal(document.getElementById('chord-name').textContent, 'Dm');
+    assert.equal(document.getElementById('chord-input').value, 'Dm');
+    assert.equal(document.getElementById('chord-root').value, 'D');
+    assert.equal(document.getElementById('chord-type').value, 'minor');
+    assert.ok(document.querySelector('.note[data-note="D"]').classList.contains('chord-root'));
+    assert.ok(document.querySelector('#diatonic-list .match-chip[data-symbol="Dm"]').classList.contains('active'));
+
+    dom.window.close();
+});
+
+test('derives diatonic chords from the parent scale for pentatonic and blues scales', () => {
+    const dom = createApp();
+    const document = dom.window.document;
+
+    selectScale(dom, 'A', 'harmonic minor');
+    let labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
+    assert.deepEqual(labels, ['i · Am', 'ii° · Bdim', 'III+ · Caug', 'iv · Dm', 'V · E', 'VI · F', 'vii° · G#dim']);
+
+    selectScale(dom, 'A', 'minor pentatonic');
+    labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
+    assert.deepEqual(labels, ['i · Am', 'III · C', 'iv · Dm', 'v · Em', 'VII · G']);
+    assert.equal(document.getElementById('diatonic-label').textContent, 'Diatonic chords in A Minor Pentatonic (numbered from A Minor):');
+
+    selectScale(dom, 'C', 'major pentatonic');
+    labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
+    assert.deepEqual(labels, ['I · C', 'ii · Dm', 'iii · Em', 'V · G', 'vi · Am']);
+
+    selectScale(dom, 'A', 'minor blues');
+    labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
+    assert.deepEqual(labels, ['i · Am', 'III · C', 'iv · Dm', 'v · Em', 'VII · G']);
+
+    dom.window.close();
+});

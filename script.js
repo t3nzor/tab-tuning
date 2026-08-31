@@ -297,7 +297,7 @@ function applyScale(root, typeName) {
     var displayNotes = scale.notes;
     var notesSet = new Set(displayNotes.map(toSharp));
     var label = tonic + ' ' + formatScaleName(typeName);
-    activeScale = { notes: notesSet, tonic: tonic, label: label, type: typeName };
+    activeScale = { notes: notesSet, tonic: tonic, label: label, type: typeName, ordered: displayNotes };
     displayScale(label, displayNotes);
     renderFretboard();
     renderScaleMatches();
@@ -349,6 +349,83 @@ function renderScaleMatches() {
             document.getElementById('scale-type').value = type;
             applyScale(root, type);
             renderScaleMatches();
+        });
+    }
+    renderDiatonicChords();
+}
+
+var PENTATONIC_PARENTS = {
+    'major pentatonic': 'major',
+    'minor pentatonic': 'minor',
+    'minor blues': 'minor',
+    'major blues': 'major',
+};
+
+var ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+
+function buildTriads(sevenNotes, filterSet) {
+    var chords = [];
+    var qualities = {
+        '4,7': ['', false, ''],
+        '3,7': ['m', true, ''],
+        '3,6': ['dim', true, '°'],
+        '4,8': ['aug', false, '+'],
+    };
+    var semi = function(n) { return NOTES.indexOf(toSharp(n)); };
+    for (var d = 0; d < 7; d++) {
+        var root = sevenNotes[d];
+        if (filterSet && !filterSet.has(toSharp(root))) continue;
+        var third = sevenNotes[(d + 2) % 7];
+        var fifth = sevenNotes[(d + 4) % 7];
+        var t = (semi(third) - semi(root) + 12) % 12;
+        var f = (semi(fifth) - semi(root) + 12) % 12;
+        var q = qualities[t + ',' + f];
+        if (!q) continue;
+        var numeral = ROMAN_NUMERALS[d];
+        if (q[1]) numeral = numeral.toLowerCase();
+        numeral += q[2];
+        chords.push({ symbol: root + q[0], numeral: numeral });
+    }
+    return chords;
+}
+
+function getDiatonicChords() {
+    if (!activeScale || !activeScale.ordered) return [];
+    var ordered = activeScale.ordered;
+    if (ordered.length === 7) return buildTriads(ordered, null);
+    var parentType = PENTATONIC_PARENTS[activeScale.type];
+    if (!parentType || !hasTonal) return [];
+    var parent = Tonal.Scale.get(activeScale.tonic + ' ' + parentType);
+    if (parent.empty || !parent.tonic) return [];
+    return buildTriads(parent.notes, activeScale.notes);
+}
+
+function renderDiatonicChords() {
+    var labelEl = document.getElementById('diatonic-label');
+    var listEl = document.getElementById('diatonic-list');
+    var chords = getDiatonicChords();
+    if (!activeScale || !chords.length) {
+        labelEl.textContent = '';
+        listEl.innerHTML = '';
+        return;
+    }
+    var label = 'Diatonic chords in ' + activeScale.label;
+    if (activeScale.ordered.length !== 7) {
+        label += ' (numbered from ' + activeScale.tonic + ' ' + formatScaleName(PENTATONIC_PARENTS[activeScale.type]) + ')';
+    }
+    labelEl.textContent = label + ':';
+    var html = '';
+    chords.forEach(function(c) {
+        var isActive = activeChord && activeChord.label === c.symbol;
+        html += '<button class="match-chip' + (isActive ? ' active' : '') + '" data-symbol="' + c.symbol + '">' + c.numeral + ' · ' + c.symbol + '</button>';
+    });
+    listEl.innerHTML = html;
+    var buttons = listEl.querySelectorAll('.match-chip');
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].addEventListener('click', function() {
+            var symbol = this.getAttribute('data-symbol');
+            document.getElementById('chord-input').value = symbol;
+            applyChord(symbol);
         });
     }
 }
