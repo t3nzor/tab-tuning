@@ -19,6 +19,29 @@ h1 {
     font-size: 1.5rem;
 }
 
+.page-header {
+    position: relative;
+}
+
+.repo-link {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    color: #888;
+    text-decoration: none;
+    border: 1px solid #444;
+    padding: 0.25rem 0.6rem;
+    border-radius: 1rem;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.repo-link:hover {
+    color: #e0e0e0;
+    border-color: #666;
+}
+
 .controls {
     max-width: 900px;
     margin: 0 auto 2rem;
