@@ -11,7 +11,7 @@ const TUNINGS = {
     openG:     ['D', 'G', 'D', 'G', 'B', 'D'],
     openD:     ['D', 'A', 'D', 'F#', 'A', 'D'],
     perfect4ths: ['E', 'A', 'D', 'G', 'C', 'F'],
-    majorThirds: ['F', 'A', 'C#', 'F', 'A', 'C#'],
+    majorThirds: ['G', 'B', 'D#', 'G', 'B', 'D#'],
 };
 
 const PRESET_LABELS = {
@@ -23,7 +23,7 @@ const PRESET_LABELS = {
     openG: 'Open G (D G D G B D)',
     openD: 'Open D (D A D F# A D)',
     perfect4ths: 'Perfect 4ths (E A D G C F)',
-    majorThirds: 'Major Thirds (F A C# F A C#)',
+    majorThirds: 'Major Thirds (G B D# G B D#)',
     custom: 'Custom',
 };
 

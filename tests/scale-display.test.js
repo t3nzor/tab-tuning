@@ -48,8 +48,8 @@ test('initializes the fretboard with the default major-thirds tuning and default
     const document = dom.window.document;
 
     assert.equal(document.getElementById('preset').value, 'majorThirds');
-    assert.equal(document.getElementById('string6').value, 'F');
-    assert.equal(document.getElementById('string1').value, 'C#');
+    assert.equal(document.getElementById('string6').value, 'G');
+    assert.equal(document.getElementById('string1').value, 'D#');
     assert.equal(document.querySelectorAll('#tuning-selects select').length, 6);
     assert.equal(document.querySelectorAll('#tuning-selects option').length, 72);
     assert.equal(document.querySelectorAll('.fretboard .note').length, 114);
