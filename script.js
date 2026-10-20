@@ -78,6 +78,7 @@ function renderFretboard() {
     fretboard.innerHTML = html;
     fretboard.style.gridTemplateColumns = 'repeat(' + (NUM_FRETS + 1) + ', minmax(2.5rem, 1fr))';
     highlightAll();
+    renderOpenChords();
 }
 
 // ---- Presets ----
@@ -131,7 +132,7 @@ var activeChord = null;
 var activeScale = null;
 var showChord = true;
 var showIntervals = false;
-var showStickers = true;
+var showStickers = false;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -171,6 +172,17 @@ var SCALE_TYPES = [
     { name: 'harmonic minor', label: 'Harmonic Minor', short: 'Harm Minor' },
     { name: 'melodic minor', label: 'Melodic Minor', short: 'Mel Minor' },
     { name: 'harmonic major', label: 'Harmonic Major', short: 'Harm Major' },
+];
+
+var OPEN_TYPES = [
+    'major',
+    'minor',
+    'dominant seventh',
+    'major seventh',
+    'minor seventh',
+    'suspended second',
+    'suspended fourth',
+    'diminished',
 ];
 
 function toSharp(note) {
@@ -219,12 +231,51 @@ function highlightAll() {
             el.classList.add(pc === activeChord.tonic ? 'chord-root' : 'chord-tone');
         }
     }
+    renderFingering();
 }
 
 function clearHighlights() {
     var notes = document.querySelectorAll('.fretboard .note');
     for (var i = 0; i < notes.length; i++) {
         notes[i].classList.remove('chord-tone', 'chord-root', 'scale-tone', 'scale-root');
+    }
+    clearFingering();
+}
+
+function clearFingering() {
+    var marked = document.querySelectorAll('.fretboard .note.finger-pos');
+    for (var i = 0; i < marked.length; i++) {
+        marked[i].classList.remove('finger-pos');
+    }
+    var muted = document.querySelectorAll('.fretboard .cell.muted-string');
+    for (var m = 0; m < muted.length; m++) {
+        muted[m].classList.remove('muted-string');
+    }
+    var marks = document.querySelectorAll('.fretboard .mute-mark');
+    for (var k = 0; k < marks.length; k++) {
+        marks[k].parentNode.removeChild(marks[k]);
+    }
+}
+
+function renderFingering() {
+    clearFingering();
+    if (!activeChord || !activeChord.ordered || !showChord) return;
+    var tuning = getCurrentTuning();
+    var voicing = openVoicingBest(tuning, activeChord.ordered, activeChord.tonic);
+    if (!voicing) return;
+    var cells = document.querySelectorAll('.fretboard .cell');
+    for (var s = 0; s < tuning.length; s++) {
+        var row = tuning.length - 1 - s;
+        var index = row * (NUM_FRETS + 1);
+        if (!voicing[s]) {
+            cells[index].classList.add('muted-string');
+            var mark = document.createElement('span');
+            mark.className = 'mute-mark';
+            mark.textContent = '×';
+            cells[index].appendChild(mark);
+        } else if (voicing[s][1] > 0) {
+            cells[index + voicing[s][1]].querySelector('.note').classList.add('finger-pos');
+        }
     }
 }
 
@@ -259,7 +310,7 @@ function applyChord(symbol) {
     var tonic = toSharp(chord.tonic);
     var notes = chord.notes.map(toSharp);
     var notesSet = new Set(notes);
-    activeChord = { notes: notesSet, tonic: tonic, label: symbol.trim() };
+    activeChord = { notes: notesSet, tonic: tonic, label: symbol.trim(), ordered: notes };
     displayChord(symbol.trim(), notes);
     highlightAll();
     document.getElementById('chord-root').value = tonic;
@@ -330,6 +381,8 @@ function renderScaleMatches() {
     if (!activeChord) {
         labelEl.textContent = '';
         listEl.innerHTML = '';
+        renderDiatonicChords();
+        renderOpenChords();
         return;
     }
     var matches = findScalesForChord(activeChord.notes);
@@ -352,6 +405,7 @@ function renderScaleMatches() {
         });
     }
     renderDiatonicChords();
+    renderOpenChords();
 }
 
 var PENTATONIC_PARENTS = {
@@ -418,6 +472,195 @@ function renderDiatonicChords() {
     chords.forEach(function(c) {
         var isActive = activeChord && activeChord.label === c.symbol;
         html += '<button class="match-chip' + (isActive ? ' active' : '') + '" data-symbol="' + c.symbol + '">' + c.numeral + ' · ' + c.symbol + '</button>';
+    });
+    listEl.innerHTML = html;
+    var buttons = listEl.querySelectorAll('.match-chip');
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].addEventListener('click', function() {
+            var symbol = this.getAttribute('data-symbol');
+            document.getElementById('chord-input').value = symbol;
+            applyChord(symbol);
+        });
+    }
+}
+
+var OPEN_MAX_FRET = 4;
+var OPEN_MIN_OPEN_STRINGS = 2;
+var OPEN_MAX_FINGERS = 3;
+var OPEN_MAX_SPAN = 2;
+
+function openVoicingExists(tuning, tones) {
+    for (var t = 0; t < tones.length; t++) {
+        var reachable = false;
+        for (var ts = 0; ts < tuning.length && !reachable; ts++) {
+            for (var tf = 0; tf <= OPEN_MAX_FRET && !reachable; tf++) {
+                if (noteAt(tuning[ts], tf) === tones[t]) reachable = true;
+            }
+        }
+        if (!reachable) return false;
+    }
+    var options = [];
+    for (var s = 0; s < tuning.length; s++) {
+        var opts = [null];
+        tones.forEach(function(tone, ti) {
+            for (var f = 0; f <= OPEN_MAX_FRET; f++) {
+                if (noteAt(tuning[s], f) === tone) opts.push([ti, f]);
+            }
+        });
+        options.push(opts);
+    }
+    var chosen = [];
+    function search(s) {
+        if (s === tuning.length) {
+            var covered = new Set();
+            var opens = 0;
+            var frets = new Set();
+            var firstSounded = -1;
+            var lastSounded = -1;
+            var sounded = 0;
+            var minFret = OPEN_MAX_FRET + 1;
+            var maxFret = 0;
+            for (var i = 0; i < tuning.length; i++) {
+                var c = chosen[i];
+                if (!c) continue;
+                covered.add(c[0]);
+                sounded++;
+                if (firstSounded === -1) firstSounded = i;
+                lastSounded = i;
+                if (c[1] === 0) opens++;
+                else {
+                    frets.add(c[1]);
+                    if (c[1] < minFret) minFret = c[1];
+                    if (c[1] > maxFret) maxFret = c[1];
+                }
+            }
+            if (covered.size !== tones.length) return false;
+            if (opens < OPEN_MIN_OPEN_STRINGS) return false;
+            if (frets.size > OPEN_MAX_FINGERS) return false;
+            if (lastSounded - firstSounded !== sounded - 1) return false;
+            if (frets.size && maxFret - minFret > OPEN_MAX_SPAN) return false;
+            return true;
+        }
+        for (var j = 0; j < options[s].length; j++) {
+            chosen[s] = options[s][j];
+            if (search(s + 1)) return true;
+        }
+        chosen[s] = null;
+        return false;
+    }
+    return search(0);
+}
+
+function openVoicingBest(tuning, tones, tonic) {
+    var options = [];
+    for (var s = 0; s < tuning.length; s++) {
+        var opts = [null];
+        tones.forEach(function(tone, ti) {
+            for (var f = 0; f <= OPEN_MAX_FRET; f++) {
+                if (noteAt(tuning[s], f) === tone) opts.push([ti, f]);
+            }
+        });
+        options.push(opts);
+    }
+    var best = null;
+    var bestScore = null;
+    var chosen = [];
+    function scoreLess(a, b) {
+        for (var i = 0; i < a.length; i++) {
+            if (a[i] < b[i]) return true;
+            if (a[i] > b[i]) return false;
+        }
+        return false;
+    }
+    function evaluate() {
+        var covered = new Set();
+        var opens = 0;
+        var frets = new Set();
+        var firstSounded = -1;
+        var lastSounded = -1;
+        var sounded = 0;
+        var minFret = OPEN_MAX_FRET + 1;
+        var maxFret = 0;
+        var sumFret = 0;
+        for (var i = 0; i < tuning.length; i++) {
+            var c = chosen[i];
+            if (!c) continue;
+            covered.add(c[0]);
+            sounded++;
+            if (firstSounded === -1) firstSounded = i;
+            lastSounded = i;
+            if (c[1] === 0) opens++;
+            else {
+                frets.add(c[1]);
+                if (c[1] < minFret) minFret = c[1];
+                if (c[1] > maxFret) maxFret = c[1];
+                sumFret += c[1];
+            }
+        }
+        if (covered.size !== tones.length) return;
+        if (opens < OPEN_MIN_OPEN_STRINGS) return;
+        if (frets.size > OPEN_MAX_FINGERS) return;
+        if (lastSounded - firstSounded !== sounded - 1) return;
+        if (frets.size && maxFret - minFret > OPEN_MAX_SPAN) return;
+        var rootBass = noteAt(tuning[firstSounded], chosen[firstSounded][1]) === tonic ? 0 : 1;
+        var tiebreak = '';
+        for (var j = 0; j < tuning.length; j++) {
+            tiebreak += chosen[j] ? String(chosen[j][1]) : 'x';
+        }
+        var score = [rootBass, -sounded, maxFret, sumFret, tiebreak];
+        if (bestScore === null || scoreLess(score, bestScore)) {
+            bestScore = score;
+            best = chosen.slice();
+        }
+    }
+    function search(s) {
+        if (s === tuning.length) {
+            evaluate();
+            return;
+        }
+        for (var j = 0; j < options[s].length; j++) {
+            chosen[s] = options[s][j];
+            search(s + 1);
+        }
+        chosen[s] = null;
+    }
+    search(0);
+    return best;
+}
+
+function findOpenChords() {
+    if (!hasTonal) return [];
+    var tuning = getCurrentTuning();
+    var results = [];
+    NOTES.forEach(function(root) {
+        OPEN_TYPES.forEach(function(typeName) {
+            var entry = CHORD_TYPES.find(function(t) { return t.name === typeName; });
+            var chord = Tonal.Chord.get(root + entry.symbol);
+            if (chord.empty || !chord.tonic) return;
+            var tones = [];
+            chord.notes.map(toSharp).forEach(function(n) {
+                if (tones.indexOf(n) === -1) tones.push(n);
+            });
+            if (openVoicingExists(tuning, tones)) results.push({ symbol: root + entry.symbol });
+        });
+    });
+    return results;
+}
+
+function renderOpenChords() {
+    var labelEl = document.getElementById('open-chords-label');
+    var listEl = document.getElementById('open-chords-list');
+    var chords = findOpenChords();
+    if (!chords.length) {
+        labelEl.textContent = '';
+        listEl.innerHTML = '';
+        return;
+    }
+    labelEl.textContent = 'Open chords in ' + getCurrentTuning().join(' ') + ':';
+    var html = '';
+    chords.forEach(function(c) {
+        var isActive = activeChord && activeChord.label === c.symbol;
+        html += '<button class="match-chip' + (isActive ? ' active' : '') + '" data-symbol="' + c.symbol + '">' + c.symbol + '</button>';
     });
     listEl.innerHTML = html;
     var buttons = listEl.querySelectorAll('.match-chip');
@@ -526,8 +769,8 @@ document.addEventListener('DOMContentLoaded', function() {
         renderFretboard();
     });
 
-    applyPreset('majorThirds');
-    presetSelect.value = 'majorThirds';
+    applyPreset('standard');
+    presetSelect.value = 'standard';
     renderFretboard();
 
     document.getElementById('show-stickers').addEventListener('change', function() {

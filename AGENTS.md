@@ -25,10 +25,13 @@ No lint, typecheck, or CI config exists. Verification = `npm test`.
 - `tests/scale-display.test.js` is an integration test: it loads real `index.html` in JSDOM (`runScripts: 'outside-only'`), sets `window.Tonal = Tonal` (the npm package, substituting the CDN script), evals real `script.js`, then dispatches `DOMContentLoaded`.
 - Renaming element IDs or restructuring `#tuning-selects`, `.fret-num`, `.cell.nut`, etc. will break tests — assertions depend on DOM structure, counts (6 strings, 72 options, 114 notes, 19 stickers), and CSS classes (`.chord-root`, `.scale-tone`, `.match-chip`).
 - `script.js` must stay browser-global-DOM compatible; don't add module imports or `require`.
+- Fretboard rows render high string on top: DOM row r (0-based) = string r+1, and `.fretboard .cell` index = r*19 + fret. String index s in `getCurrentTuning()` (0 = string6) maps to row 5−s — getting this backwards marks the wrong cells. Fingering display classes (`.finger-pos`, `.muted-string`, `.mute-mark`) are pinned by exact position in tests.
 
 ## Gotchas
 
 - `script.js` depends on the global `Tonal` from a CDN `<script>` in `index.html` — the browser app needs internet; the test harness needs `npm install`.
-- Default tuning is `majorThirds` (G B D# G B D#, string6→string1) with default chord C; tests assert these exact values.
+- Default tuning is `standard` (E A D G B E, string6→string1) with default chord C; tests assert these exact values.
+- Three chip rows share the `.match-chip` class: `#open-chords-list`, `#diatonic-list`, `#matches-list` (in that DOM order, below the fretboard). Test queries for chips must be scoped to a list id; unscoped `.match-chip` matches the open-chords row first.
+- Every chord-state change (including clears/invalid input) goes through `renderScaleMatches`, which must re-render all three chip rows — its `!activeChord` early return skips `renderDiatonicChords`/`renderOpenChords` at your peril (stale `.active` chips).
 - `.opencode/` is gitignored (local opencode plugin + plans).
 - Commit messages: short imperative subject lines, no body (see `git log`).

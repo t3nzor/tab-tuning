@@ -102,6 +102,7 @@ select {
 .cell.nut {
     border-right: 3px solid #f0e6d0;
     background: rgba(245, 237, 216, 0.15);
+    position: relative;
 }
 
 .note {
@@ -349,13 +350,42 @@ select {
     box-shadow: 0 0 0 2px #1f6e4e;
 }
 
+.note.finger-pos,
+.note.finger-pos.chord-tone,
+.note.finger-pos.chord-root,
+.note.finger-pos.scale-tone,
+.note.finger-pos.scale-root,
+.note.finger-pos.scale-tone.chord-tone,
+.note.finger-pos.scale-root.chord-tone,
+.note.finger-pos.scale-tone.chord-root,
+.note.finger-pos.scale-root.chord-root {
+    background: #4a6fa5;
+    color: #fff;
+}
+
+.cell.nut.muted-string .note {
+    opacity: 0.25;
+}
+
+.mute-mark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #e85d04;
+    font-size: 1.1rem;
+    font-weight: 700;
+    pointer-events: none;
+}
+
 .matches-row {
     max-width: 900px;
     margin: 0 auto 2rem;
 }
 
 #matches-label,
-#diatonic-label {
+#diatonic-label,
+#open-chords-label {
     font-size: 0.85rem;
     color: #888;
     margin-bottom: 0.5rem;
@@ -363,7 +393,8 @@ select {
 }
 
 #matches-list,
-#diatonic-list {
+#diatonic-list,
+#open-chords-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
