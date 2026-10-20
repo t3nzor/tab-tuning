@@ -25,7 +25,7 @@ No lint, typecheck, or CI config exists. Verification = `npm test`.
 - `tests/scale-display.test.js` is an integration test: it loads real `index.html` in JSDOM (`runScripts: 'outside-only'`), sets `window.Tonal = Tonal` (the npm package, substituting the CDN script), evals real `script.js`, then dispatches `DOMContentLoaded`.
 - Renaming element IDs or restructuring `#tuning-selects`, `.fret-num`, `.cell.nut`, etc. will break tests — assertions depend on DOM structure, counts (6 strings, 72 options, 114 notes, 19 stickers), and CSS classes (`.chord-root`, `.scale-tone`, `.match-chip`).
 - `script.js` must stay browser-global-DOM compatible; don't add module imports or `require`.
-- Fretboard rows render high string on top: DOM row r (0-based) = string r+1, and `.fretboard .cell` index = r*19 + fret. String index s in `getCurrentTuning()` (0 = string6) maps to row 5−s — getting this backwards marks the wrong cells. Fingering display classes (`.finger-pos`, `.muted-string`, `.mute-mark`) are pinned by exact position in tests.
+- Fretboard rows render high string on top: DOM row r (0-based) = string r+1, and `.fretboard .cell` index = r*19 + fret. String index s in `getCurrentTuning()` (0 = string6) maps to row 5−s — getting this backwards marks the wrong cells. Fingering display classes (`.finger-pos`, `.voicing-open`, `.muted-string`, `.fretted-string`, `.mute-mark`) are pinned by exact position in tests.
 
 ## Gotchas
 

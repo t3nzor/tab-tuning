@@ -338,12 +338,29 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
             return { string: Math.floor(idx / 19) + 1, fret: idx % 19, note: n.getAttribute('data-note') };
         });
     }
+    function openRings() {
+        const notes = [...document.querySelectorAll('.fretboard .note')];
+        return [...document.querySelectorAll('.fretboard .note.voicing-open')].map((n) => {
+            const idx = notes.indexOf(n);
+            return { string: Math.floor(idx / 19) + 1, fret: idx % 19, note: n.getAttribute('data-note') };
+        });
+    }
     function muted() {
         const cells = [...document.querySelectorAll('.fretboard .cell')];
         const out = [];
         cells.forEach((cell, i) => {
             if (cell.classList.contains('muted-string')) {
                 out.push({ string: Math.floor(i / 19) + 1, text: cell.querySelector('.mute-mark').textContent });
+            }
+        });
+        return out;
+    }
+    function frettedNuts() {
+        const cells = [...document.querySelectorAll('.fretboard .cell')];
+        const out = [];
+        cells.forEach((cell, i) => {
+            if (cell.classList.contains('fretted-string')) {
+                out.push({ string: Math.floor(i / 19) + 1, note: cell.querySelector('.note').getAttribute('data-note') });
             }
         });
         return out;
@@ -359,7 +376,16 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         { string: 4, fret: 2, note: 'E' },
         { string: 5, fret: 3, note: 'C' },
     ]);
+    assert.deepEqual(openRings(), [
+        { string: 1, fret: 0, note: 'E' },
+        { string: 3, fret: 0, note: 'G' },
+    ]);
     assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
+    assert.deepEqual(frettedNuts(), [
+        { string: 2, note: 'B' },
+        { string: 4, note: 'D' },
+        { string: 5, note: 'A' },
+    ]);
 
     typeChord('Am');
     assert.deepEqual(fingered(), [
@@ -367,24 +393,47 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         { string: 3, fret: 2, note: 'A' },
         { string: 4, fret: 2, note: 'E' },
     ]);
+    assert.deepEqual(openRings(), [
+        { string: 1, fret: 0, note: 'E' },
+        { string: 5, fret: 0, note: 'A' },
+    ]);
     assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
+    assert.deepEqual(frettedNuts(), [
+        { string: 2, note: 'B' },
+        { string: 3, note: 'G' },
+        { string: 4, note: 'D' },
+    ]);
 
     typeChord('F');
     assert.deepEqual(fingered(), []);
+    assert.deepEqual(openRings(), []);
     assert.deepEqual(muted(), []);
+    assert.deepEqual(frettedNuts(), []);
 
     typeChord('not-a-chord');
     assert.deepEqual(fingered(), []);
+    assert.deepEqual(openRings(), []);
     assert.deepEqual(muted(), []);
+    assert.deepEqual(frettedNuts(), []);
 
     typeChord('D');
     assert.deepEqual(fingered(), [
         { string: 1, fret: 2, note: 'F#' },
         { string: 2, fret: 3, note: 'D' },
         { string: 3, fret: 2, note: 'A' },
-        { string: 6, fret: 2, note: 'F#' },
     ]);
-    assert.deepEqual(muted(), []);
+    assert.deepEqual(openRings(), [
+        { string: 4, fret: 0, note: 'D' },
+    ]);
+    assert.deepEqual(muted(), [
+        { string: 5, text: '×' },
+        { string: 6, text: '×' },
+    ]);
+    assert.deepEqual(frettedNuts(), [
+        { string: 1, note: 'E' },
+        { string: 2, note: 'B' },
+        { string: 3, note: 'G' },
+    ]);
 
     changeValue(dom, 'preset', 'dropD');
     assert.deepEqual(fingered(), [
@@ -392,14 +441,26 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         { string: 2, fret: 3, note: 'D' },
         { string: 3, fret: 2, note: 'A' },
     ]);
+    assert.deepEqual(openRings(), [
+        { string: 4, fret: 0, note: 'D' },
+        { string: 5, fret: 0, note: 'A' },
+        { string: 6, fret: 0, note: 'D' },
+    ]);
     assert.deepEqual(muted(), []);
+    assert.deepEqual(frettedNuts(), [
+        { string: 1, note: 'E' },
+        { string: 2, note: 'B' },
+        { string: 3, note: 'G' },
+    ]);
 
     typeChord('Am');
     const showChord = document.getElementById('show-chord');
     showChord.checked = false;
     showChord.dispatchEvent(new dom.window.Event('change'));
     assert.deepEqual(fingered(), []);
+    assert.deepEqual(openRings(), []);
     assert.deepEqual(muted(), []);
+    assert.deepEqual(frettedNuts(), []);
 
     showChord.checked = true;
     showChord.dispatchEvent(new dom.window.Event('change'));
@@ -408,7 +469,16 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         { string: 3, fret: 2, note: 'A' },
         { string: 4, fret: 2, note: 'E' },
     ]);
+    assert.deepEqual(openRings(), [
+        { string: 1, fret: 0, note: 'E' },
+        { string: 5, fret: 0, note: 'A' },
+    ]);
     assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
+    assert.deepEqual(frettedNuts(), [
+        { string: 2, note: 'B' },
+        { string: 3, note: 'G' },
+        { string: 4, note: 'D' },
+    ]);
 
     dom.window.close();
 });

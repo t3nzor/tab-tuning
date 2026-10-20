@@ -243,13 +243,15 @@ function clearHighlights() {
 }
 
 function clearFingering() {
-    var marked = document.querySelectorAll('.fretboard .note.finger-pos');
+    var marked = document.querySelectorAll('.fretboard .note.finger-pos, .fretboard .note.voicing-open');
     for (var i = 0; i < marked.length; i++) {
         marked[i].classList.remove('finger-pos');
+        marked[i].classList.remove('voicing-open');
     }
-    var muted = document.querySelectorAll('.fretboard .cell.muted-string');
+    var muted = document.querySelectorAll('.fretboard .cell.muted-string, .fretboard .cell.fretted-string');
     for (var m = 0; m < muted.length; m++) {
         muted[m].classList.remove('muted-string');
+        muted[m].classList.remove('fretted-string');
     }
     var marks = document.querySelectorAll('.fretboard .mute-mark');
     for (var k = 0; k < marks.length; k++) {
@@ -261,7 +263,8 @@ function renderFingering() {
     clearFingering();
     if (!activeChord || !activeChord.ordered || !showChord) return;
     var tuning = getCurrentTuning();
-    var voicing = openVoicingBest(tuning, activeChord.ordered, activeChord.tonic);
+    if (!openVoicingExists(tuning, activeChord.ordered)) return;
+    var voicing = openVoicingBest(tuning, activeChord.ordered, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS);
     if (!voicing) return;
     var cells = document.querySelectorAll('.fretboard .cell');
     for (var s = 0; s < tuning.length; s++) {
@@ -274,7 +277,10 @@ function renderFingering() {
             mark.textContent = '×';
             cells[index].appendChild(mark);
         } else if (voicing[s][1] > 0) {
+            cells[index].classList.add('fretted-string');
             cells[index + voicing[s][1]].querySelector('.note').classList.add('finger-pos');
+        } else {
+            cells[index].querySelector('.note').classList.add('voicing-open');
         }
     }
 }
@@ -488,6 +494,7 @@ var OPEN_MAX_FRET = 4;
 var OPEN_MIN_OPEN_STRINGS = 2;
 var OPEN_MAX_FINGERS = 3;
 var OPEN_MAX_SPAN = 2;
+var OPEN_DISPLAY_MIN_OPEN_STRINGS = 1;
 
 function openVoicingExists(tuning, tones) {
     for (var t = 0; t < tones.length; t++) {
@@ -551,7 +558,7 @@ function openVoicingExists(tuning, tones) {
     return search(0);
 }
 
-function openVoicingBest(tuning, tones, tonic) {
+function openVoicingBest(tuning, tones, tonic, minOpens) {
     var options = [];
     for (var s = 0; s < tuning.length; s++) {
         var opts = [null];
@@ -598,7 +605,7 @@ function openVoicingBest(tuning, tones, tonic) {
             }
         }
         if (covered.size !== tones.length) return;
-        if (opens < OPEN_MIN_OPEN_STRINGS) return;
+        if (opens < minOpens) return;
         if (frets.size > OPEN_MAX_FINGERS) return;
         if (lastSounded - firstSounded !== sounded - 1) return;
         if (frets.size && maxFret - minFret > OPEN_MAX_SPAN) return;
