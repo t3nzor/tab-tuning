@@ -133,6 +133,7 @@ var activeScale = null;
 var showChord = true;
 var showIntervals = false;
 var showStickers = false;
+var lowPosition = true;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -259,14 +260,32 @@ function clearFingering() {
     }
 }
 
+function openVoicingSame(a, b) {
+    for (var i = 0; i < a.length; i++) {
+        var fa = a[i] ? a[i][1] : -1;
+        var fb = b[i] ? b[i][1] : -1;
+        if (fa !== fb) return false;
+    }
+    return true;
+}
+
 function renderFingering() {
     clearFingering();
     if (!activeChord || !activeChord.ordered || !showChord) return;
     var tuning = getCurrentTuning();
     if (!openVoicingExists(tuning, activeChord.ordered)) return;
-    var voicing = openVoicingBest(tuning, activeChord.ordered, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS);
-    if (!voicing) return;
+    var lowMaxFret = Math.min(OPEN_LOW_FRET, OPEN_MAX_FRET);
+    var low = openVoicingBest(tuning, activeChord.ordered, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS, lowMaxFret);
+    var full = openVoicingBest(tuning, activeChord.ordered, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS, OPEN_MAX_FRET);
+    if (!low && !full) return;
+    var single = !low || !full || openVoicingSame(low, full);
+    var chosenIsLow = !!low && (single || lowPosition);
+    var voicing = chosenIsLow ? low : full;
+    var checkbox = document.getElementById('low-position');
+    checkbox.disabled = single;
+    checkbox.checked = chosenIsLow;
     var cells = document.querySelectorAll('.fretboard .cell');
+    if (!cells.length) return;
     for (var s = 0; s < tuning.length; s++) {
         var row = tuning.length - 1 - s;
         var index = row * (NUM_FRETS + 1);
@@ -490,149 +509,202 @@ function renderDiatonicChords() {
     }
 }
 
-var OPEN_MAX_FRET = 4;
+var OPEN_MAX_FRET = 12;
 var OPEN_MIN_OPEN_STRINGS = 2;
 var OPEN_MAX_FINGERS = 3;
 var OPEN_MAX_SPAN = 2;
+var OPEN_LOW_FRET = 4;
 var OPEN_DISPLAY_MIN_OPEN_STRINGS = 1;
 
-function openVoicingExists(tuning, tones) {
+function openVoicingReachable(tuning, tones, maxFret) {
     for (var t = 0; t < tones.length; t++) {
         var reachable = false;
         for (var ts = 0; ts < tuning.length && !reachable; ts++) {
-            for (var tf = 0; tf <= OPEN_MAX_FRET && !reachable; tf++) {
+            for (var tf = 0; tf <= maxFret && !reachable; tf++) {
                 if (noteAt(tuning[ts], tf) === tones[t]) reachable = true;
             }
         }
         if (!reachable) return false;
     }
-    var options = [];
-    for (var s = 0; s < tuning.length; s++) {
-        var opts = [null];
-        tones.forEach(function(tone, ti) {
-            for (var f = 0; f <= OPEN_MAX_FRET; f++) {
-                if (noteAt(tuning[s], f) === tone) opts.push([ti, f]);
-            }
-        });
-        options.push(opts);
-    }
-    var chosen = [];
-    function search(s) {
-        if (s === tuning.length) {
-            var covered = new Set();
-            var opens = 0;
-            var frets = new Set();
-            var firstSounded = -1;
-            var lastSounded = -1;
-            var sounded = 0;
-            var minFret = OPEN_MAX_FRET + 1;
-            var maxFret = 0;
-            for (var i = 0; i < tuning.length; i++) {
-                var c = chosen[i];
-                if (!c) continue;
-                covered.add(c[0]);
-                sounded++;
-                if (firstSounded === -1) firstSounded = i;
-                lastSounded = i;
-                if (c[1] === 0) opens++;
-                else {
-                    frets.add(c[1]);
-                    if (c[1] < minFret) minFret = c[1];
-                    if (c[1] > maxFret) maxFret = c[1];
-                }
-            }
-            if (covered.size !== tones.length) return false;
-            if (opens < OPEN_MIN_OPEN_STRINGS) return false;
-            if (frets.size > OPEN_MAX_FINGERS) return false;
-            if (lastSounded - firstSounded !== sounded - 1) return false;
-            if (frets.size && maxFret - minFret > OPEN_MAX_SPAN) return false;
-            return true;
-        }
-        for (var j = 0; j < options[s].length; j++) {
-            chosen[s] = options[s][j];
-            if (search(s + 1)) return true;
-        }
-        chosen[s] = null;
-        return false;
-    }
-    return search(0);
+    return true;
 }
 
-function openVoicingBest(tuning, tones, tonic, minOpens) {
-    var options = [];
-    for (var s = 0; s < tuning.length; s++) {
+// Enumerate every valid open-position voicing: all tones covered on distinct
+// strings, contiguous sounded block, fret span <= OPEN_MAX_SPAN, at most
+// OPEN_MAX_FINGERS fretted strings (no barres), at least minOpens open
+// strings, frets <= maxFret. callback(voicing) returning true stops the search.
+function openVoicingEach(tuning, tones, minOpens, maxFret, callback) {
+    var n = tuning.length;
+    if (!openVoicingReachable(tuning, tones, maxFret)) return;
+    var options = new Array(n);
+    for (var s = 0; s < n; s++) {
+        var openIdx = NOTES.indexOf(tuning[s]);
         var opts = [null];
-        tones.forEach(function(tone, ti) {
-            for (var f = 0; f <= OPEN_MAX_FRET; f++) {
-                if (noteAt(tuning[s], f) === tone) opts.push([ti, f]);
+        for (var ti = 0; ti < tones.length; ti++) {
+            var base = ((NOTES.indexOf(tones[ti]) - openIdx) % 12 + 12) % 12;
+            if (base <= maxFret) opts.push([ti, base]);
+            if (base !== 0 && base + 12 <= maxFret) opts.push([ti, base + 12]);
+        }
+        options[s] = opts;
+    }
+    var fullMask = (1 << tones.length) - 1;
+    var chosen = new Array(n);
+    var fretStrings = {};
+    var frets = [];
+    var covered = 0;
+    var opens = [];
+    var sounded = 0;
+    var fretted = 0;
+    var first = -1;
+    var last = -1;
+    var stopped = false;
+
+    function pruned(s) {
+        var remaining = n - s;
+        var uncovered = tones.length;
+        for (var mask = covered; mask; mask &= mask - 1) uncovered--;
+        if (uncovered > remaining) return true;
+        if (opens.length + remaining < minOpens) return true;
+        if (frets.length > OPEN_MAX_FINGERS) return true;
+        if (frets.length) {
+            var lo = frets[0];
+            var hi = frets[0];
+            for (var i = 1; i < frets.length; i++) {
+                if (frets[i] < lo) lo = frets[i];
+                if (frets[i] > hi) hi = frets[i];
             }
-        });
-        options.push(opts);
+            if (hi - lo > OPEN_MAX_SPAN) return true;
+        }
+        return false;
+    }
+
+    function leaf() {
+        if (covered !== fullMask) return false;
+        if (opens.length < minOpens) return false;
+        if (last - first !== sounded - 1) return false;
+        if (frets.length > 1) {
+            var lo = frets[0];
+            var hi = frets[0];
+            for (var i = 1; i < frets.length; i++) {
+                if (frets[i] < lo) lo = frets[i];
+                if (frets[i] > hi) hi = frets[i];
+            }
+            if (hi - lo > OPEN_MAX_SPAN) return false;
+        }
+        if (fretted > OPEN_MAX_FINGERS) return false;
+        return callback(chosen.slice());
+    }
+
+    function search(s) {
+        if (stopped) return;
+        if (s === n) {
+            if (leaf()) stopped = true;
+            return;
+        }
+        if (pruned(s)) return;
+        var opts = options[s];
+        for (var j = 0; j < opts.length && !stopped; j++) {
+            var opt = opts[j];
+            chosen[s] = opt;
+            if (opt) {
+                var fret = opt[1];
+                var bit = 1 << opt[0];
+                var hadBit = (covered & bit) !== 0;
+                covered |= bit;
+                sounded++;
+                var prevFirst = first;
+                var prevLast = last;
+                if (first === -1) first = s;
+                last = s;
+                if (fret === 0) {
+                    opens.push(s);
+                    search(s + 1);
+                    opens.pop();
+                } else {
+                    var arr = fretStrings[fret];
+                    if (!arr) { arr = []; fretStrings[fret] = arr; frets.push(fret); }
+                    arr.push(s);
+                    fretted++;
+                    search(s + 1);
+                    fretted--;
+                    arr.pop();
+                    if (!arr.length) {
+                        delete fretStrings[fret];
+                        frets.splice(frets.indexOf(fret), 1);
+                    }
+                }
+                sounded--;
+                first = prevFirst;
+                last = prevLast;
+                if (!hadBit) covered &= ~bit;
+            } else {
+                search(s + 1);
+            }
+        }
+        chosen[s] = null;
+    }
+
+    search(0);
+}
+
+function openVoicingExists(tuning, tones) {
+    var found = false;
+    openVoicingEach(tuning, tones, OPEN_MIN_OPEN_STRINGS, OPEN_MAX_FRET, function() {
+        found = true;
+        return true;
+    });
+    return found;
+}
+
+function openScoreLess(a, b) {
+    for (var i = 0; i < a.length; i++) {
+        if (a[i] < b[i]) return true;
+        if (a[i] > b[i]) return false;
+    }
+    return false;
+}
+
+function openVoicingScore(tuning, voicing, tonic) {
+    var maxFret = 0;
+    var sumFret = 0;
+    var sounded = 0;
+    var firstSounded = -1;
+    for (var i = 0; i < voicing.length; i++) {
+        var c = voicing[i];
+        if (!c) continue;
+        sounded++;
+        if (firstSounded === -1) firstSounded = i;
+        if (c[1] > maxFret) maxFret = c[1];
+        sumFret += c[1];
+    }
+    var rootBass = noteAt(tuning[firstSounded], voicing[firstSounded][1]) === tonic ? 0 : 1;
+    var tiebreak = '';
+    for (var j = 0; j < voicing.length; j++) {
+        tiebreak += voicing[j] ? (voicing[j][1] < 10 ? '0' + voicing[j][1] : String(voicing[j][1])) : 'xx';
+    }
+    return [rootBass, maxFret, -sounded, sumFret, tiebreak];
+}
+
+var openVoicingMemo = { key: null, best: null };
+
+function openVoicingBest(tuning, tones, tonic, minOpens, maxFret) {
+    var key = tuning.join(',') + '|' + tones.join(',') + '|' + tonic + '|' + minOpens + '|' + maxFret;
+    if (openVoicingMemo.key === key) {
+        return openVoicingMemo.best ? openVoicingMemo.best.slice() : null;
     }
     var best = null;
     var bestScore = null;
-    var chosen = [];
-    function scoreLess(a, b) {
-        for (var i = 0; i < a.length; i++) {
-            if (a[i] < b[i]) return true;
-            if (a[i] > b[i]) return false;
+    openVoicingEach(tuning, tones, minOpens, maxFret, function(voicing) {
+        var score = openVoicingScore(tuning, voicing, tonic);
+        if (bestScore === null || openScoreLess(score, bestScore)) {
+            bestScore = score;
+            best = voicing;
         }
         return false;
-    }
-    function evaluate() {
-        var covered = new Set();
-        var opens = 0;
-        var frets = new Set();
-        var firstSounded = -1;
-        var lastSounded = -1;
-        var sounded = 0;
-        var minFret = OPEN_MAX_FRET + 1;
-        var maxFret = 0;
-        var sumFret = 0;
-        for (var i = 0; i < tuning.length; i++) {
-            var c = chosen[i];
-            if (!c) continue;
-            covered.add(c[0]);
-            sounded++;
-            if (firstSounded === -1) firstSounded = i;
-            lastSounded = i;
-            if (c[1] === 0) opens++;
-            else {
-                frets.add(c[1]);
-                if (c[1] < minFret) minFret = c[1];
-                if (c[1] > maxFret) maxFret = c[1];
-                sumFret += c[1];
-            }
-        }
-        if (covered.size !== tones.length) return;
-        if (opens < minOpens) return;
-        if (frets.size > OPEN_MAX_FINGERS) return;
-        if (lastSounded - firstSounded !== sounded - 1) return;
-        if (frets.size && maxFret - minFret > OPEN_MAX_SPAN) return;
-        var rootBass = noteAt(tuning[firstSounded], chosen[firstSounded][1]) === tonic ? 0 : 1;
-        var tiebreak = '';
-        for (var j = 0; j < tuning.length; j++) {
-            tiebreak += chosen[j] ? String(chosen[j][1]) : 'x';
-        }
-        var score = [rootBass, -sounded, maxFret, sumFret, tiebreak];
-        if (bestScore === null || scoreLess(score, bestScore)) {
-            bestScore = score;
-            best = chosen.slice();
-        }
-    }
-    function search(s) {
-        if (s === tuning.length) {
-            evaluate();
-            return;
-        }
-        for (var j = 0; j < options[s].length; j++) {
-            chosen[s] = options[s][j];
-            search(s + 1);
-        }
-        chosen[s] = null;
-    }
-    search(0);
-    return best;
+    });
+    openVoicingMemo.key = key;
+    openVoicingMemo.best = best ? best.slice() : null;
+    return best ? best.slice() : null;
 }
 
 function findOpenChords() {
@@ -663,7 +735,7 @@ function renderOpenChords() {
         listEl.innerHTML = '';
         return;
     }
-    labelEl.textContent = 'Open chords in ' + getCurrentTuning().join(' ') + ':';
+    labelEl.textContent = 'Open chords in ' + getCurrentTuning().join(' ') + ' up to fret ' + OPEN_MAX_FRET + ':';
     var html = '';
     chords.forEach(function(c) {
         var isActive = activeChord && activeChord.label === c.symbol;
@@ -720,6 +792,11 @@ function initChordControls() {
         highlightAll();
     });
 
+    document.getElementById('low-position').addEventListener('change', function() {
+        lowPosition = this.checked;
+        renderFingering();
+    });
+
     rootSelect.value = 'C';
     typeSelect.value = 'major';
     chordInput.value = 'C';
@@ -769,6 +846,17 @@ document.addEventListener('DOMContentLoaded', function() {
     initStringSelects();
     initChordControls();
     initScaleControls();
+
+    var openMaxFret = document.getElementById('open-max-fret');
+    var parsedFret = parseInt(openMaxFret.value, 10);
+    if (!isNaN(parsedFret)) OPEN_MAX_FRET = Math.min(Math.max(parsedFret, 0), NUM_FRETS);
+    openMaxFret.addEventListener('change', function() {
+        var value = parseInt(this.value, 10);
+        if (isNaN(value)) value = OPEN_MAX_FRET;
+        OPEN_MAX_FRET = Math.min(Math.max(value, 0), NUM_FRETS);
+        this.value = OPEN_MAX_FRET;
+        renderFretboard();
+    });
 
     var presetSelect = document.getElementById('preset');
     presetSelect.addEventListener('change', function() {

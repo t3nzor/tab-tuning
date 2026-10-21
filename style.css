@@ -189,6 +189,16 @@ select {
     width: 140px;
 }
 
+#open-max-fret {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    width: 4.2rem;
+}
+
 #chord-input.invalid {
     border-color: #c44;
 }
@@ -201,7 +211,8 @@ select {
     flex: 1;
 }
 
-.show-chord {
+.show-chord,
+.low-position {
     display: flex;
     align-items: center;
     gap: 0.3rem;
@@ -209,6 +220,11 @@ select {
     flex-shrink: 0;
     cursor: pointer;
     accent-color: #d4a017;
+}
+
+.low-position:has(input:disabled) {
+    opacity: 0.45;
+    cursor: default;
 }
 
 .show-intervals {
@@ -359,12 +375,12 @@ select {
 .note.finger-pos.scale-root.chord-tone,
 .note.finger-pos.scale-tone.chord-root,
 .note.finger-pos.scale-root.chord-root {
-    background: #4a6fa5;
+    background: #c2558f;
     color: #fff;
 }
 
 .note.voicing-open {
-    outline: 2px solid #4a6fa5;
+    outline: 2px solid #c2558f;
     outline-offset: 1px;
 }
 
