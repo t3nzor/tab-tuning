@@ -83,6 +83,7 @@ select {
 }
 
 .fretboard {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(19, minmax(2.5rem, 1fr));
     background: #b8945a;
@@ -92,6 +93,8 @@ select {
 }
 
 .cell {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -211,8 +214,7 @@ select {
     flex: 1;
 }
 
-.show-chord,
-.low-position {
+.show-chord {
     display: flex;
     align-items: center;
     gap: 0.3rem;
@@ -220,11 +222,6 @@ select {
     flex-shrink: 0;
     cursor: pointer;
     accent-color: #d4a017;
-}
-
-.low-position:has(input:disabled) {
-    opacity: 0.45;
-    cursor: default;
 }
 
 .show-intervals {
@@ -384,6 +381,16 @@ select {
     outline-offset: 1px;
 }
 
+.barre-line {
+    position: absolute;
+    z-index: 0;
+    background: rgba(194, 85, 143, 0.35);
+    border: 2px solid #c2558f;
+    border-radius: 0.9rem;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
 .fretboard .cell.nut.fretted-string .note {
     background: rgba(255, 255, 255, 0.2);
     color: #2a1f0e;
@@ -409,6 +416,7 @@ select {
 .matches-row {
     max-width: 900px;
     margin: 0 auto 2rem;
+    overflow-x: auto;
 }
 
 #matches-label,
@@ -421,11 +429,42 @@ select {
 }
 
 #matches-list,
-#diatonic-list,
-#open-chords-list {
+#diatonic-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
+}
+
+#open-chords-list {
+    display: grid;
+    grid-template-columns: auto repeat(8, minmax(4.5rem, 1fr));
+    gap: 0.35rem;
+    align-items: stretch;
+}
+
+#open-chords-list .match-chip {
+    width: 100%;
+    text-align: center;
+    border-radius: 0.4rem;
+    padding: 0.3rem 0.4rem;
+}
+
+.chip-placeholder {
+    visibility: hidden;
+}
+
+.type-label,
+.root-label {
+    font-size: 0.75rem;
+    color: #888;
+    align-self: center;
+}
+
+.root-label {
+    font-weight: 700;
+    text-align: right;
+    padding-right: 0.5rem;
+    color: #aaa;
 }
 
 .match-chip {

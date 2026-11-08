@@ -43,6 +43,14 @@ function inputValue(dom, value) {
     return input;
 }
 
+const CHIP_ROOTS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const CHIP_TYPES = ['', 'm', '7', 'maj7', 'm7', 'sus2', 'sus4', 'dim'];
+const allPlayableChips = CHIP_ROOTS.flatMap((root) => CHIP_TYPES.map((type) => root + type));
+
+function openChips(dom) {
+    return [...dom.window.document.querySelectorAll('#open-chords-list .match-chip')].map((b) => b.textContent);
+}
+
 test('initializes the fretboard with the default standard tuning and default C chord', () => {
     const dom = createApp();
     const document = dom.window.document;
@@ -286,25 +294,27 @@ test('derives diatonic chords from the parent scale for pentatonic and blues sca
     dom.window.close();
 });
 
-test('lists open chords for the selected tuning', () => {
+test('lists playable chords for the selected tuning', () => {
     const dom = createApp();
     const document = dom.window.document;
 
-    const labels = [...document.querySelectorAll('#open-chords-list .match-chip')].map((b) => b.textContent);
-    assert.equal(document.getElementById('open-chords-label').textContent, 'Open chords in E A D G B E up to fret 12:');
-    assert.deepEqual(labels, ['C', 'C7', 'Cmaj7', 'Csus2', 'C#m7', 'C#dim', 'D', 'Dm', 'D7', 'Dmaj7', 'Dm7', 'Dsus2', 'Dsus4', 'D#maj7', 'E', 'Em', 'E7', 'Emaj7', 'Em7', 'Esus2', 'Esus4', 'Edim', 'Fmaj7', 'F#m7', 'G', 'Gm', 'G7', 'Gmaj7', 'Gm7', 'Gsus2', 'Gsus4', 'G#dim', 'A', 'Am', 'A7', 'Amaj7', 'Am7', 'Asus2', 'Asus4', 'A#maj7', 'Bm', 'B7', 'Bm7', 'Bsus4', 'Bdim']);
+    const labels = openChips(dom);
+    assert.equal(document.getElementById('open-chords-label').textContent, 'Playable chords in E A D G B E up to fret 12:');
+    assert.deepEqual(labels, allPlayableChips);
+    assert.ok(document.querySelector('#open-chords-list .type-label'));
+    assert.equal(document.querySelectorAll('#open-chords-list .root-label').length, 12);
 
     changeValue(dom, 'preset', 'dropD');
-    const dropDLabels = [...document.querySelectorAll('#open-chords-list .match-chip')].map((b) => b.textContent);
-    assert.equal(document.getElementById('open-chords-label').textContent, 'Open chords in D A D G B E up to fret 12:');
-    assert.deepEqual(dropDLabels, ['C', 'C7', 'Cmaj7', 'Csus2', 'C#m7', 'C#dim', 'D', 'Dm', 'D7', 'Dmaj7', 'Dm7', 'Dsus2', 'Dsus4', 'Ddim', 'D#maj7', 'E', 'Em', 'E7', 'Emaj7', 'Em7', 'Esus2', 'Esus4', 'Edim', 'Fmaj7', 'F#m7', 'G', 'Gm', 'G7', 'Gmaj7', 'Gm7', 'Gsus2', 'Gsus4', 'G#dim', 'A', 'Am', 'A7', 'Amaj7', 'Am7', 'Asus2', 'Asus4', 'A#7', 'A#maj7', 'Bm', 'B7', 'Bm7', 'Bsus4', 'Bdim']);
+    const dropDLabels = openChips(dom);
+    assert.equal(document.getElementById('open-chords-label').textContent, 'Playable chords in D A D G B E up to fret 12:');
+    assert.deepEqual(dropDLabels, allPlayableChips);
 
     changeValue(dom, 'string6', 'C');
-    const customLabels = [...document.querySelectorAll('#open-chords-list .match-chip')].map((b) => b.textContent);
-    assert.equal(customLabels.length, 54);
+    const customLabels = openChips(dom);
+    assert.equal(customLabels.length, 96);
     assert.ok(customLabels.includes('Cm'));
     assert.ok(customLabels.includes('F7'));
-    assert.ok(!customLabels.includes('F#sus4'));
+    assert.ok(customLabels.includes('F#sus4'));
 
     dom.window.close();
 });
@@ -365,6 +375,13 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         });
         return out;
     }
+    function barres() {
+        return [...document.querySelectorAll('.fretboard .barre-line')].map((l) => ({
+            fret: Number(l.getAttribute('data-fret')),
+            from: Number(l.getAttribute('data-from-string')),
+            to: Number(l.getAttribute('data-to-string')),
+        }));
+    }
     function typeChord(value) {
         const input = document.getElementById('chord-input');
         input.value = value;
@@ -381,14 +398,12 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         { string: 3, fret: 0, note: 'G' },
     ]);
     assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
+    assert.deepEqual(barres(), []);
     assert.deepEqual(frettedNuts(), [
         { string: 2, note: 'B' },
         { string: 4, note: 'D' },
         { string: 5, note: 'A' },
     ]);
-    const lowToggle = document.getElementById('low-position');
-    assert.equal(lowToggle.checked, true);
-    assert.equal(lowToggle.disabled, true);
 
     typeChord('Am');
     assert.deepEqual(fingered(), [
@@ -406,18 +421,32 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         { string: 3, note: 'G' },
         { string: 4, note: 'D' },
     ]);
+    assert.deepEqual(barres(), []);
 
     typeChord('F');
-    assert.deepEqual(fingered(), []);
+    assert.deepEqual(fingered(), [
+        { string: 3, fret: 2, note: 'A' },
+        { string: 4, fret: 3, note: 'F' },
+        { string: 5, fret: 3, note: 'C' },
+    ]);
     assert.deepEqual(openRings(), []);
     assert.deepEqual(muted(), []);
-    assert.deepEqual(frettedNuts(), []);
+    assert.deepEqual(barres(), [{ fret: 1, from: 1, to: 6 }]);
+    assert.deepEqual(frettedNuts(), [
+        { string: 1, note: 'E' },
+        { string: 2, note: 'B' },
+        { string: 3, note: 'G' },
+        { string: 4, note: 'D' },
+        { string: 5, note: 'A' },
+        { string: 6, note: 'E' },
+    ]);
 
     typeChord('not-a-chord');
     assert.deepEqual(fingered(), []);
     assert.deepEqual(openRings(), []);
     assert.deepEqual(muted(), []);
     assert.deepEqual(frettedNuts(), []);
+    assert.deepEqual(barres(), []);
 
     typeChord('D');
     assert.deepEqual(fingered(), [
@@ -437,6 +466,7 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
         { string: 2, note: 'B' },
         { string: 3, note: 'G' },
     ]);
+    assert.deepEqual(barres(), []);
 
     changeValue(dom, 'preset', 'dropD');
     assert.deepEqual(fingered(), [
@@ -487,69 +517,60 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
     typeChord('C7');
     assert.deepEqual(fingered(), [
         { string: 2, fret: 1, note: 'C' },
+        { string: 3, fret: 3, note: 'A#' },
         { string: 4, fret: 2, note: 'E' },
-        { string: 5, fret: 1, note: 'A#' },
+        { string: 5, fret: 3, note: 'C' },
     ]);
     assert.deepEqual(openRings(), [
         { string: 1, fret: 0, note: 'E' },
-        { string: 3, fret: 0, note: 'G' },
-        { string: 6, fret: 0, note: 'E' },
     ]);
-    assert.deepEqual(muted(), []);
-    assert.equal(lowToggle.checked, true);
-    assert.equal(lowToggle.disabled, false);
+    assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
+    assert.deepEqual(barres(), []);
+    assert.deepEqual(frettedNuts(), [
+        { string: 2, note: 'B' },
+        { string: 3, note: 'G' },
+        { string: 4, note: 'D' },
+        { string: 5, note: 'A' },
+    ]);
 
-    lowToggle.checked = false;
-    lowToggle.dispatchEvent(new dom.window.Event('change'));
+    typeChord('Gm7');
     assert.deepEqual(fingered(), [
-        { string: 4, fret: 8, note: 'A#' },
-        { string: 5, fret: 7, note: 'E' },
-        { string: 6, fret: 8, note: 'C' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 3, fret: 0, note: 'G' },
-    ]);
-    assert.deepEqual(muted(), [
-        { string: 1, text: '×' },
-        { string: 2, text: '×' },
-    ]);
-    assert.equal(lowToggle.checked, false);
-    assert.equal(lowToggle.disabled, false);
-
-    lowToggle.checked = true;
-    lowToggle.dispatchEvent(new dom.window.Event('change'));
-    assert.deepEqual(fingered(), [
-        { string: 2, fret: 1, note: 'C' },
-        { string: 4, fret: 2, note: 'E' },
+        { string: 1, fret: 1, note: 'F' },
+        { string: 2, fret: 3, note: 'D' },
+        { string: 3, fret: 3, note: 'A#' },
+        { string: 4, fret: 3, note: 'F' },
         { string: 5, fret: 1, note: 'A#' },
+        { string: 6, fret: 3, note: 'G' },
     ]);
-
-    typeChord('Am');
-    assert.equal(document.getElementById('low-position').disabled, true);
+    assert.deepEqual(openRings(), []);
+    assert.deepEqual(muted(), []);
+    assert.deepEqual(barres(), []);
 
     dom.window.close();
 });
 
-test('adjusts the open chord search with the max-fret control', () => {
+test('adjusts the playable chord search with the max-fret control', () => {
     const dom = createApp();
     const document = dom.window.document;
 
     const fretInput = document.getElementById('open-max-fret');
     assert.equal(fretInput.value, '12');
-    assert.equal(document.querySelectorAll('#open-chords-list .match-chip').length, 45);
+    assert.equal(openChips(dom).length, 96);
     assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="Gm7"]'));
-    assert.equal(document.querySelector('#open-chords-list .match-chip[data-symbol="C#m"]'), null);
+    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="C#m"]'));
 
-    fretInput.value = '4';
+    fretInput.value = '3';
     fretInput.dispatchEvent(new dom.window.Event('change'));
-    assert.equal(document.getElementById('open-chords-label').textContent, 'Open chords in E A D G B E up to fret 4:');
-    assert.equal(document.querySelectorAll('#open-chords-list .match-chip').length, 42);
-    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="Gm7"]'));
-    assert.equal(document.querySelector('#open-chords-list .match-chip[data-symbol="C#m"]'), null);
+    assert.equal(document.getElementById('open-chords-label').textContent, 'Playable chords in E A D G B E up to fret 3:');
+    assert.equal(openChips(dom).length, 94);
+    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="C#m"]'));
+    assert.equal(document.querySelector('#open-chords-list .match-chip[data-symbol="F#sus4"]'), null);
+    assert.equal(document.querySelector('#open-chords-list .match-chip[data-symbol="Bsus2"]'), null);
+    assert.ok(document.querySelector('#open-chords-list .chip-placeholder'));
 
     fretInput.value = '12';
     fretInput.dispatchEvent(new dom.window.Event('change'));
-    assert.equal(document.querySelectorAll('#open-chords-list .match-chip').length, 45);
+    assert.equal(openChips(dom).length, 96);
     assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="Gm7"]'));
 
     dom.window.close();
