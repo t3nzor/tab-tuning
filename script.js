@@ -801,14 +801,26 @@ function openVoicingScore(tuning, voicing, tonic, tones) {
     }
     var openCapable = Object.keys(openNotes).length;
     var shortfall = 0;
+    var adjacentOpen = 0;
     var spread = 0;
     if (openCapable <= 1) {
         shortfall = sounded < 5 ? 5 - sounded : 0;
         Object.keys(fretStrings).forEach(function(fret) {
             var fretNum = Number(fret);
-            var strings = fretStrings[fret].slice().sort(function(a, b) { return a - b; });
-            for (var k = 1; k < strings.length; k++) {
-                for (var m = strings[k - 1] + 1; m < strings[k]; m++) {
+            var strings = fretStrings[fret];
+            if (strings.length >= 2) {
+                var lo = strings[0];
+                var hi = strings[0];
+                for (var k = 1; k < strings.length; k++) {
+                    if (strings[k] < lo) lo = strings[k];
+                    if (strings[k] > hi) hi = strings[k];
+                }
+                if (lo > 0 && voicing[lo - 1] && voicing[lo - 1][1] === 0) adjacentOpen++;
+                if (hi < voicing.length - 1 && voicing[hi + 1] && voicing[hi + 1][1] === 0) adjacentOpen++;
+            }
+            var sorted = strings.slice().sort(function(a, b) { return a - b; });
+            for (var k = 1; k < sorted.length; k++) {
+                for (var m = sorted[k - 1] + 1; m < sorted[k]; m++) {
                     if (voicing[m] && voicing[m][1] < fretNum) {
                         spread++;
                         break;
@@ -821,7 +833,7 @@ function openVoicingScore(tuning, voicing, tonic, tones) {
     for (var j = 0; j < voicing.length; j++) {
         tiebreak += voicing[j] ? (voicing[j][1] < 10 ? '0' + voicing[j][1] : String(voicing[j][1])) : 'xx';
     }
-    return [rootBass, shortfall, spread, maxFret, -sounded, barrePenalty, sumFret, tiebreak];
+    return [rootBass, shortfall, adjacentOpen, spread, maxFret, -sounded, barrePenalty, sumFret, tiebreak];
 }
 
 var openVoicingMemo = { key: null, best: null };

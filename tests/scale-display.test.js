@@ -572,6 +572,15 @@ test('shows the suggested fingering for open chords on the fretboard', () => {
     assert.deepEqual(muted(), []);
     assert.deepEqual(barres(), []);
 
+    typeChord('G#m');
+    assert.deepEqual(fingered(), [
+        { string: 4, fret: 6, note: 'G#' },
+        { string: 5, fret: 6, note: 'D#' },
+    ]);
+    assert.deepEqual(openRings(), []);
+    assert.deepEqual(muted(), []);
+    assert.deepEqual(barres(), [{ fret: 4, from: 1, to: 6 }]);
+
     dom.window.close();
 });
 
