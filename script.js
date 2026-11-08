@@ -78,7 +78,6 @@ function renderFretboard() {
     fretboard.innerHTML = html;
     fretboard.style.gridTemplateColumns = 'repeat(' + (NUM_FRETS + 1) + ', minmax(2.5rem, 1fr))';
     highlightAll();
-    renderOpenChords();
 }
 
 // ---- Presets ----
@@ -133,9 +132,6 @@ var activeScale = null;
 var showChord = true;
 var showIntervals = false;
 var showStickers = false;
-var shapeChoices = [];
-var shapeIndex = 0;
-var shapeKey = null;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -234,7 +230,6 @@ function highlightAll() {
             el.classList.add(pc === activeChord.tonic ? 'chord-root' : 'chord-tone');
         }
     }
-    renderFingering();
 }
 
 function clearHighlights() {
@@ -242,56 +237,6 @@ function clearHighlights() {
     for (var i = 0; i < notes.length; i++) {
         notes[i].classList.remove('chord-tone', 'chord-root', 'scale-tone', 'scale-root');
     }
-    clearFingering();
-    updateShapeControls();
-}
-
-function clearFingering() {
-    var marked = document.querySelectorAll('.fretboard .note.finger-pos, .fretboard .note.voicing-open');
-    for (var i = 0; i < marked.length; i++) {
-        marked[i].classList.remove('finger-pos');
-        marked[i].classList.remove('voicing-open');
-    }
-    var muted = document.querySelectorAll('.fretboard .cell.muted-string, .fretboard .cell.fretted-string');
-    for (var m = 0; m < muted.length; m++) {
-        muted[m].classList.remove('muted-string');
-        muted[m].classList.remove('fretted-string');
-    }
-    var marks = document.querySelectorAll('.fretboard .mute-mark');
-    for (var k = 0; k < marks.length; k++) {
-        marks[k].parentNode.removeChild(marks[k]);
-    }
-    var lines = document.querySelectorAll('.fretboard .barre-line');
-    for (var b = 0; b < lines.length; b++) {
-        lines[b].parentNode.removeChild(lines[b]);
-    }
-}
-
-var FRET_CELL_HEIGHT = 2.5;
-var BOARD_PAD_TOP = 0.5;
-
-function renderBarreLine(fret, strings, stringCount) {
-    var board = document.getElementById('fretboard');
-    if (!board) return;
-    var minS = strings[0];
-    var maxS = strings[0];
-    for (var i = 1; i < strings.length; i++) {
-        if (strings[i] < minS) minS = strings[i];
-        if (strings[i] > maxS) maxS = strings[i];
-    }
-    var topRow = stringCount - 1 - maxS;
-    var span = maxS - minS + 1;
-    var colPct = 100 / (NUM_FRETS + 1);
-    var line = document.createElement('span');
-    line.className = 'barre-line';
-    line.setAttribute('data-fret', String(fret));
-    line.setAttribute('data-from-string', String(stringCount - maxS));
-    line.setAttribute('data-to-string', String(stringCount - minS));
-    line.style.left = (fret * colPct) + '%';
-    line.style.width = colPct + '%';
-    line.style.top = (BOARD_PAD_TOP + topRow * FRET_CELL_HEIGHT) + 'rem';
-    line.style.height = (span * FRET_CELL_HEIGHT) + 'rem';
-    board.appendChild(line);
 }
 
 // A flat finger can't cross a sounded string fretted lower than the barre
@@ -308,94 +253,6 @@ function barreFingerable(fret, strings, voicing) {
         if (voicing[s] && voicing[s][1] < fret) return false;
     }
     return true;
-}
-
-function computeShapeKey(tuning, mask) {
-    return (activeChord ? activeChord.label : '') + '|' + tuning.join(',') + '|' + OPEN_MAX_FRET + '|' + mask;
-}
-
-function updateShapeControls() {
-    var row = document.getElementById('shape-row');
-    var slider = document.getElementById('shape-slider');
-    var info = document.getElementById('shape-info');
-    if (!row || !slider || !info) return;
-    if (!activeChord || !shapeChoices.length || !showChord) {
-        row.hidden = true;
-        return;
-    }
-    row.hidden = false;
-    slider.max = String(shapeChoices.length);
-    slider.disabled = shapeChoices.length < 2;
-    slider.value = String(shapeIndex + 1);
-    var voicing = shapeChoices[shapeIndex];
-    var vector = [];
-    for (var i = 0; i < voicing.length; i++) {
-        vector.push(voicing[i] ? (voicing[i][1] === 0 ? '0' : String(voicing[i][1])) : 'x');
-    }
-    info.textContent = (shapeIndex + 1) + '/' + shapeChoices.length + ' · ' + vector.join('-');
-}
-
-function renderFingering() {
-    clearFingering();
-    if (!activeChord || !activeChord.ordered || !showChord) {
-        updateShapeControls();
-        return;
-    }
-    var tuning = getCurrentTuning();
-    var tones = activeChord.ordered;
-    var requiredMask = (1 << tones.length) - 1;
-    // 7th chords and richer may drop the 5th (the classic open C7 omits G);
-    // triads keep full coverage — a triad without its 5th is half a chord.
-    if (tones.length >= 4) {
-        var fifth = toSharp(noteAt(activeChord.tonic, 7));
-        var fifthIdx = tones.indexOf(fifth);
-        if (fifthIdx !== -1) requiredMask &= ~(1 << fifthIdx);
-    }
-    var key = computeShapeKey(tuning, requiredMask);
-    if (shapeKey !== key) {
-        shapeKey = key;
-        shapeIndex = 0;
-        shapeChoices = openVoicingRanked(tuning, tones, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS, OPEN_MAX_FRET, requiredMask, OPEN_SHAPE_COUNT);
-    }
-    var voicing = shapeChoices[shapeIndex] || openVoicingBest(tuning, tones, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS, OPEN_MAX_FRET, requiredMask);
-    updateShapeControls();
-    if (!voicing) return;
-    var cells = document.querySelectorAll('.fretboard .cell');
-    if (!cells.length) return;
-    var barreStrings = {};
-    for (var i = 0; i < voicing.length; i++) {
-        if (voicing[i] && voicing[i][1] > 0) {
-            var fret = voicing[i][1];
-            if (!barreStrings[fret]) barreStrings[fret] = [];
-            barreStrings[fret].push(i);
-        }
-    }
-    for (var s = 0; s < tuning.length; s++) {
-        var row = tuning.length - 1 - s;
-        var index = row * (NUM_FRETS + 1);
-        if (!voicing[s]) {
-            cells[index].classList.add('muted-string');
-            var mark = document.createElement('span');
-            mark.className = 'mute-mark';
-            mark.textContent = '×';
-            cells[index].appendChild(mark);
-        } else if (voicing[s][1] > 0) {
-            cells[index].classList.add('fretted-string');
-            var group = barreStrings[voicing[s][1]];
-            var asBarre = group.length >= 3 && barreFingerable(voicing[s][1], group, voicing);
-            if (!asBarre) {
-                cells[index + voicing[s][1]].querySelector('.note').classList.add('finger-pos');
-            }
-        } else {
-            cells[index].querySelector('.note').classList.add('voicing-open');
-        }
-    }
-    Object.keys(barreStrings).forEach(function(f) {
-        var group = barreStrings[f];
-        if (group.length >= 3 && barreFingerable(Number(f), group, voicing)) {
-            renderBarreLine(Number(f), group, tuning.length);
-        }
-    });
 }
 
 function applyChord(symbol) {
@@ -501,7 +358,6 @@ function renderScaleMatches() {
         labelEl.textContent = '';
         listEl.innerHTML = '';
         renderDiatonicChords();
-        renderOpenChords();
         return;
     }
     var matches = findScalesForChord(activeChord.notes);
@@ -524,7 +380,6 @@ function renderScaleMatches() {
         });
     }
     renderDiatonicChords();
-    renderOpenChords();
 }
 
 var PENTATONIC_PARENTS = {
@@ -608,6 +463,18 @@ var OPEN_MIN_OPEN_STRINGS = 0;
 var OPEN_MAX_FINGERS = 4;
 var OPEN_MAX_SPAN = 3;
 var OPEN_DISPLAY_MIN_OPEN_STRINGS = 0;
+
+// 7th chords and richer may drop the 5th (the classic open C7 omits G);
+// triads keep full coverage — a triad without its 5th is half a chord.
+function openRequiredMask(tones, tonic) {
+    var requiredMask = (1 << tones.length) - 1;
+    if (tones.length >= 4) {
+        var fifth = toSharp(noteAt(tonic, 7));
+        var fifthIdx = tones.indexOf(fifth);
+        if (fifthIdx !== -1) requiredMask &= ~(1 << fifthIdx);
+    }
+    return requiredMask;
+}
 
 function openVoicingReachable(tuning, tones, maxFret) {
     for (var t = 0; t < tones.length; t++) {
@@ -858,10 +725,9 @@ function openVoicingBest(tuning, tones, tonic, minOpens, maxFret, requiredMask) 
     return best ? best.slice() : null;
 }
 
-var OPEN_SHAPE_COUNT = 6;
 var openRankedMemo = { key: null, list: null };
 
-// Top OPEN_SHAPE_COUNT voicings by score (list[0] === openVoicingBest result).
+// Top `limit` voicings by score (list[0] === openVoicingBest result).
 function openVoicingRanked(tuning, tones, tonic, minOpens, maxFret, requiredMask, limit) {
     var key = tuning.join(',') + '|' + tones.join(',') + '|' + tonic + '|' + minOpens + '|' + maxFret + '|' + requiredMask + '|' + limit;
     if (openRankedMemo.key === key) {
@@ -909,50 +775,6 @@ function findOpenChords() {
     return rows;
 }
 
-function openTypeLabel(typeName) {
-    var entry = CHORD_TYPES.find(function(t) { return t.name === typeName; });
-    return entry.symbol || 'maj';
-}
-
-function renderOpenChords() {
-    var labelEl = document.getElementById('open-chords-label');
-    var listEl = document.getElementById('open-chords-list');
-    var rows = findOpenChords();
-    var any = rows.some(function(row) {
-        return row.cells.some(function(symbol) { return symbol !== null; });
-    });
-    if (!any) {
-        labelEl.textContent = '';
-        listEl.innerHTML = '';
-        return;
-    }
-    labelEl.textContent = 'Playable chords in ' + getCurrentTuning().join(' ') + ' up to fret ' + OPEN_MAX_FRET + ':';
-    var html = '<span class="type-label"></span>';
-    OPEN_TYPES.forEach(function(typeName) {
-        html += '<span class="type-label">' + openTypeLabel(typeName) + '</span>';
-    });
-    rows.forEach(function(row) {
-        html += '<span class="root-label">' + row.root + '</span>';
-        row.cells.forEach(function(symbol) {
-            if (symbol) {
-                var isActive = activeChord && activeChord.label === symbol;
-                html += '<button class="match-chip' + (isActive ? ' active' : '') + '" data-symbol="' + symbol + '">' + symbol + '</button>';
-            } else {
-                html += '<span class="chip-placeholder"></span>';
-            }
-        });
-    });
-    listEl.innerHTML = html;
-    var buttons = listEl.querySelectorAll('.match-chip');
-    for (var i = 0; i < buttons.length; i++) {
-        buttons[i].addEventListener('click', function() {
-            var symbol = this.getAttribute('data-symbol');
-            document.getElementById('chord-input').value = symbol;
-            applyChord(symbol);
-        });
-    }
-}
-
 function initChordControls() {
     var rootSelect = document.getElementById('chord-root');
     NOTES.forEach(function(note) {
@@ -991,11 +813,6 @@ function initChordControls() {
     document.getElementById('show-chord').addEventListener('change', function() {
         showChord = this.checked;
         highlightAll();
-    });
-
-    document.getElementById('shape-slider').addEventListener('input', function() {
-        shapeIndex = Math.min(Math.max(parseInt(this.value, 10) || 1, 1), shapeChoices.length) - 1;
-        renderFingering();
     });
 
     rootSelect.value = 'C';
@@ -1047,17 +864,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initStringSelects();
     initChordControls();
     initScaleControls();
-
-    var openMaxFret = document.getElementById('open-max-fret');
-    var parsedFret = parseInt(openMaxFret.value, 10);
-    if (!isNaN(parsedFret)) OPEN_MAX_FRET = Math.min(Math.max(parsedFret, 0), NUM_FRETS);
-    openMaxFret.addEventListener('change', function() {
-        var value = parseInt(this.value, 10);
-        if (isNaN(value)) value = OPEN_MAX_FRET;
-        OPEN_MAX_FRET = Math.min(Math.max(value, 0), NUM_FRETS);
-        this.value = OPEN_MAX_FRET;
-        renderFretboard();
-    });
 
     var presetSelect = document.getElementById('preset');
     presetSelect.addEventListener('change', function() {

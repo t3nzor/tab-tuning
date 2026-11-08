@@ -47,8 +47,36 @@ const CHIP_ROOTS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 const CHIP_TYPES = ['', 'm', '7', 'maj7', 'm7', 'sus2', 'sus4', 'dim'];
 const allPlayableChips = CHIP_ROOTS.flatMap((root) => CHIP_TYPES.map((type) => root + type));
 
-function openChips(dom) {
-    return [...dom.window.document.querySelectorAll('#open-chords-list .match-chip')].map((b) => b.textContent);
+function playableSymbols(window) {
+    return Array.from(window.findOpenChords().flatMap((row) => row.cells.filter((symbol) => symbol !== null)));
+}
+
+function bestVoicing(window) {
+    const chord = window.activeChord;
+    if (!chord || !chord.ordered) return null;
+    const tuning = window.getCurrentTuning();
+    const mask = window.openRequiredMask(chord.ordered, chord.tonic);
+    return window.openVoicingBest(tuning, chord.ordered, chord.tonic, window.OPEN_DISPLAY_MIN_OPEN_STRINGS, window.OPEN_MAX_FRET, mask);
+}
+
+function voicingVector(voicing) {
+    return voicing.map((c) => (c ? (c[1] === 0 ? '0' : String(c[1])) : 'x')).join('-');
+}
+
+function barreLines(window, voicing) {
+    const groups = {};
+    voicing.forEach((c, s) => {
+        if (c && c[1] > 0) {
+            (groups[c[1]] = groups[c[1]] || []).push(s);
+        }
+    });
+    return Object.keys(groups).flatMap((fret) => {
+        const strings = groups[fret];
+        if (strings.length < 3 || !window.barreFingerable(Number(fret), strings, voicing)) return [];
+        const lo = Math.min(...strings);
+        const hi = Math.max(...strings);
+        return [{ fret: Number(fret), from: 6 - hi, to: 6 - lo }];
+    });
 }
 
 test('initializes the fretboard with the default standard tuning and default C chord', () => {
@@ -64,6 +92,9 @@ test('initializes the fretboard with the default standard tuning and default C c
     assert.equal(document.getElementById('chord-name').textContent, 'C');
     assert.equal(document.getElementById('scale-type').value, '');
     assert.ok(document.querySelector('.note[data-note="C"]').classList.contains('chord-root'));
+    assert.equal(document.getElementById('open-max-fret'), null);
+    assert.equal(document.getElementById('open-chords-list'), null);
+    assert.equal(document.getElementById('shape-slider'), null);
 
     const showStickers = document.getElementById('show-stickers');
     assert.equal(showStickers.checked, false);
@@ -294,405 +325,139 @@ test('derives diatonic chords from the parent scale for pentatonic and blues sca
     dom.window.close();
 });
 
-test('lists playable chords for the selected tuning', () => {
+test('finds playable chords for the selected tuning', () => {
     const dom = createApp();
-    const document = dom.window.document;
+    const window = dom.window;
 
-    const labels = openChips(dom);
-    assert.equal(document.getElementById('open-chords-label').textContent, 'Playable chords in E A D G B E up to fret 12:');
-    assert.deepEqual(labels, allPlayableChips);
-    assert.ok(document.querySelector('#open-chords-list .type-label'));
-    assert.equal(document.querySelectorAll('#open-chords-list .root-label').length, 12);
+    assert.deepEqual(playableSymbols(window), allPlayableChips);
 
     changeValue(dom, 'preset', 'dropD');
-    const dropDLabels = openChips(dom);
-    assert.equal(document.getElementById('open-chords-label').textContent, 'Playable chords in D A D G B E up to fret 12:');
-    assert.deepEqual(dropDLabels, allPlayableChips);
+    assert.deepEqual(playableSymbols(window), allPlayableChips);
 
     changeValue(dom, 'string6', 'C');
-    const customLabels = openChips(dom);
-    assert.equal(customLabels.length, 96);
-    assert.ok(customLabels.includes('Cm'));
-    assert.ok(customLabels.includes('F7'));
-    assert.ok(customLabels.includes('F#sus4'));
+    const customSymbols = playableSymbols(window);
+    assert.equal(customSymbols.length, 96);
+    assert.ok(customSymbols.includes('Cm'));
+    assert.ok(customSymbols.includes('F7'));
+    assert.ok(customSymbols.includes('F#sus4'));
 
     dom.window.close();
 });
 
-test('activates an open chord from a chip click', () => {
+test('suggests playable voicings for the active chord', () => {
     const dom = createApp();
-    const document = dom.window.document;
-    const chip = document.querySelector('#open-chords-list .match-chip[data-symbol="Am"]');
+    const window = dom.window;
 
-    assert.ok(chip);
-    chip.click();
+    const c = bestVoicing(window);
+    assert.equal(voicingVector(c), 'x-3-2-0-1-0');
+    assert.deepEqual(barreLines(window, c), []);
 
-    assert.equal(document.getElementById('chord-name').textContent, 'Am');
-    assert.equal(document.getElementById('chord-input').value, 'Am');
-    assert.equal(document.getElementById('chord-root').value, 'A');
-    assert.equal(document.getElementById('chord-type').value, 'minor');
-    assert.ok(document.querySelector('.note[data-note="A"]').classList.contains('chord-root'));
-    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="Am"]').classList.contains('active'));
+    inputValue(dom, 'Am');
+    const am = bestVoicing(window);
+    assert.equal(voicingVector(am), 'x-0-2-2-1-0');
+    assert.deepEqual(barreLines(window, am), []);
 
-    dom.window.close();
-});
+    inputValue(dom, 'F');
+    const f = bestVoicing(window);
+    assert.equal(voicingVector(f), '1-3-3-2-1-1');
+    assert.deepEqual(barreLines(window, f), [{ fret: 1, from: 1, to: 6 }]);
 
-test('shows the suggested fingering for open chords on the fretboard', () => {
-    const dom = createApp();
-    const document = dom.window.document;
+    inputValue(dom, 'not-a-chord');
+    assert.equal(window.activeChord, null);
+    assert.equal(bestVoicing(window), null);
 
-    function fingered() {
-        const notes = [...document.querySelectorAll('.fretboard .note')];
-        return [...document.querySelectorAll('.fretboard .note.finger-pos')].map((n) => {
-            const idx = notes.indexOf(n);
-            return { string: Math.floor(idx / 19) + 1, fret: idx % 19, note: n.getAttribute('data-note') };
-        });
-    }
-    function openRings() {
-        const notes = [...document.querySelectorAll('.fretboard .note')];
-        return [...document.querySelectorAll('.fretboard .note.voicing-open')].map((n) => {
-            const idx = notes.indexOf(n);
-            return { string: Math.floor(idx / 19) + 1, fret: idx % 19, note: n.getAttribute('data-note') };
-        });
-    }
-    function muted() {
-        const cells = [...document.querySelectorAll('.fretboard .cell')];
-        const out = [];
-        cells.forEach((cell, i) => {
-            if (cell.classList.contains('muted-string')) {
-                out.push({ string: Math.floor(i / 19) + 1, text: cell.querySelector('.mute-mark').textContent });
-            }
-        });
-        return out;
-    }
-    function frettedNuts() {
-        const cells = [...document.querySelectorAll('.fretboard .cell')];
-        const out = [];
-        cells.forEach((cell, i) => {
-            if (cell.classList.contains('fretted-string')) {
-                out.push({ string: Math.floor(i / 19) + 1, note: cell.querySelector('.note').getAttribute('data-note') });
-            }
-        });
-        return out;
-    }
-    function barres() {
-        return [...document.querySelectorAll('.fretboard .barre-line')].map((l) => ({
-            fret: Number(l.getAttribute('data-fret')),
-            from: Number(l.getAttribute('data-from-string')),
-            to: Number(l.getAttribute('data-to-string')),
-        }));
-    }
-    function typeChord(value) {
-        const input = document.getElementById('chord-input');
-        input.value = value;
-        input.dispatchEvent(new dom.window.Event('input'));
-    }
-
-    assert.deepEqual(fingered(), [
-        { string: 2, fret: 1, note: 'C' },
-        { string: 4, fret: 2, note: 'E' },
-        { string: 5, fret: 3, note: 'C' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 1, fret: 0, note: 'E' },
-        { string: 3, fret: 0, note: 'G' },
-    ]);
-    assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
-    assert.deepEqual(barres(), []);
-    assert.deepEqual(frettedNuts(), [
-        { string: 2, note: 'B' },
-        { string: 4, note: 'D' },
-        { string: 5, note: 'A' },
-    ]);
-
-    typeChord('Am');
-    assert.deepEqual(fingered(), [
-        { string: 2, fret: 1, note: 'C' },
-        { string: 3, fret: 2, note: 'A' },
-        { string: 4, fret: 2, note: 'E' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 1, fret: 0, note: 'E' },
-        { string: 5, fret: 0, note: 'A' },
-    ]);
-    assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
-    assert.deepEqual(frettedNuts(), [
-        { string: 2, note: 'B' },
-        { string: 3, note: 'G' },
-        { string: 4, note: 'D' },
-    ]);
-    assert.deepEqual(barres(), []);
-
-    typeChord('F');
-    assert.deepEqual(fingered(), [
-        { string: 3, fret: 2, note: 'A' },
-        { string: 4, fret: 3, note: 'F' },
-        { string: 5, fret: 3, note: 'C' },
-    ]);
-    assert.deepEqual(openRings(), []);
-    assert.deepEqual(muted(), []);
-    assert.deepEqual(barres(), [{ fret: 1, from: 1, to: 6 }]);
-    assert.deepEqual(frettedNuts(), [
-        { string: 1, note: 'E' },
-        { string: 2, note: 'B' },
-        { string: 3, note: 'G' },
-        { string: 4, note: 'D' },
-        { string: 5, note: 'A' },
-        { string: 6, note: 'E' },
-    ]);
-
-    typeChord('not-a-chord');
-    assert.deepEqual(fingered(), []);
-    assert.deepEqual(openRings(), []);
-    assert.deepEqual(muted(), []);
-    assert.deepEqual(frettedNuts(), []);
-    assert.deepEqual(barres(), []);
-
-    typeChord('D');
-    assert.deepEqual(fingered(), [
-        { string: 1, fret: 2, note: 'F#' },
-        { string: 2, fret: 3, note: 'D' },
-        { string: 3, fret: 2, note: 'A' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 4, fret: 0, note: 'D' },
-    ]);
-    assert.deepEqual(muted(), [
-        { string: 5, text: '×' },
-        { string: 6, text: '×' },
-    ]);
-    assert.deepEqual(frettedNuts(), [
-        { string: 1, note: 'E' },
-        { string: 2, note: 'B' },
-        { string: 3, note: 'G' },
-    ]);
-    assert.deepEqual(barres(), []);
+    inputValue(dom, 'D');
+    const d = bestVoicing(window);
+    assert.equal(voicingVector(d), 'x-x-0-2-3-2');
+    assert.deepEqual(barreLines(window, d), []);
 
     changeValue(dom, 'preset', 'dropD');
-    assert.deepEqual(fingered(), [
-        { string: 1, fret: 2, note: 'F#' },
-        { string: 2, fret: 3, note: 'D' },
-        { string: 3, fret: 2, note: 'A' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 4, fret: 0, note: 'D' },
-        { string: 5, fret: 0, note: 'A' },
-        { string: 6, fret: 0, note: 'D' },
-    ]);
-    assert.deepEqual(muted(), []);
-    assert.deepEqual(frettedNuts(), [
-        { string: 1, note: 'E' },
-        { string: 2, note: 'B' },
-        { string: 3, note: 'G' },
-    ]);
+    const dDropD = bestVoicing(window);
+    assert.equal(voicingVector(dDropD), '0-0-0-2-3-2');
+    assert.deepEqual(barreLines(window, dDropD), []);
 
-    typeChord('Am');
-    const showChord = document.getElementById('show-chord');
-    showChord.checked = false;
-    showChord.dispatchEvent(new dom.window.Event('change'));
-    assert.deepEqual(fingered(), []);
-    assert.deepEqual(openRings(), []);
-    assert.deepEqual(muted(), []);
-    assert.deepEqual(frettedNuts(), []);
-
-    showChord.checked = true;
-    showChord.dispatchEvent(new dom.window.Event('change'));
-    assert.deepEqual(fingered(), [
-        { string: 2, fret: 1, note: 'C' },
-        { string: 3, fret: 2, note: 'A' },
-        { string: 4, fret: 2, note: 'E' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 1, fret: 0, note: 'E' },
-        { string: 5, fret: 0, note: 'A' },
-    ]);
-    assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
-    assert.deepEqual(frettedNuts(), [
-        { string: 2, note: 'B' },
-        { string: 3, note: 'G' },
-        { string: 4, note: 'D' },
-    ]);
+    inputValue(dom, 'Am');
+    const amDropD = bestVoicing(window);
+    assert.equal(voicingVector(amDropD), 'x-0-2-2-1-0');
+    assert.deepEqual(barreLines(window, amDropD), []);
 
     changeValue(dom, 'preset', 'standard');
-    typeChord('C7');
-    assert.deepEqual(fingered(), [
-        { string: 2, fret: 1, note: 'C' },
-        { string: 3, fret: 3, note: 'A#' },
-        { string: 4, fret: 2, note: 'E' },
-        { string: 5, fret: 3, note: 'C' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 1, fret: 0, note: 'E' },
-    ]);
-    assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
-    assert.deepEqual(barres(), []);
-    assert.deepEqual(frettedNuts(), [
-        { string: 2, note: 'B' },
-        { string: 3, note: 'G' },
-        { string: 4, note: 'D' },
-        { string: 5, note: 'A' },
-    ]);
+    inputValue(dom, 'C7');
+    const c7 = bestVoicing(window);
+    assert.equal(voicingVector(c7), 'x-3-2-3-1-0');
+    assert.deepEqual(barreLines(window, c7), []);
 
-    typeChord('Cm');
-    assert.deepEqual(fingered(), [
-        { string: 1, fret: 3, note: 'G' },
-        { string: 2, fret: 4, note: 'D#' },
-        { string: 3, fret: 5, note: 'C' },
-        { string: 4, fret: 5, note: 'G' },
-        { string: 5, fret: 3, note: 'C' },
-    ]);
-    assert.deepEqual(openRings(), []);
-    assert.deepEqual(muted(), [{ string: 6, text: '×' }]);
-    assert.deepEqual(barres(), []);
+    inputValue(dom, 'Cm');
+    const cm = bestVoicing(window);
+    assert.equal(voicingVector(cm), 'x-3-5-5-4-3');
+    assert.deepEqual(barreLines(window, cm), []);
 
-    typeChord('G');
-    assert.deepEqual(fingered(), [
-        { string: 1, fret: 3, note: 'G' },
-        { string: 2, fret: 3, note: 'D' },
-        { string: 5, fret: 2, note: 'B' },
-        { string: 6, fret: 3, note: 'G' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 3, fret: 0, note: 'G' },
-        { string: 4, fret: 0, note: 'D' },
-    ]);
-    assert.deepEqual(muted(), []);
-    assert.deepEqual(barres(), []);
+    inputValue(dom, 'G');
+    const g = bestVoicing(window);
+    assert.equal(voicingVector(g), '3-2-0-0-3-3');
+    assert.deepEqual(barreLines(window, g), []);
 
-    typeChord('Gm7');
-    assert.deepEqual(fingered(), [
-        { string: 1, fret: 1, note: 'F' },
-        { string: 2, fret: 3, note: 'D' },
-        { string: 3, fret: 3, note: 'A#' },
-        { string: 4, fret: 3, note: 'F' },
-        { string: 5, fret: 1, note: 'A#' },
-        { string: 6, fret: 3, note: 'G' },
-    ]);
-    assert.deepEqual(openRings(), []);
-    assert.deepEqual(muted(), []);
-    assert.deepEqual(barres(), []);
+    inputValue(dom, 'Gm7');
+    const gm7 = bestVoicing(window);
+    assert.equal(voicingVector(gm7), '3-1-3-3-3-1');
+    assert.deepEqual(barreLines(window, gm7), []);
 
-    typeChord('G#m');
-    assert.deepEqual(fingered(), [
-        { string: 4, fret: 6, note: 'G#' },
-        { string: 5, fret: 6, note: 'D#' },
-    ]);
-    assert.deepEqual(openRings(), []);
-    assert.deepEqual(muted(), []);
-    assert.deepEqual(barres(), [{ fret: 4, from: 1, to: 6 }]);
+    inputValue(dom, 'G#m');
+    const gsm = bestVoicing(window);
+    assert.equal(voicingVector(gsm), '4-6-6-4-4-4');
+    assert.deepEqual(barreLines(window, gsm), [{ fret: 4, from: 1, to: 6 }]);
 
     dom.window.close();
 });
 
-test('adjusts the playable chord search with the max-fret control', () => {
+test('limits the playable chord search to the max-fret window', () => {
     const dom = createApp();
-    const document = dom.window.document;
+    const window = dom.window;
 
-    const fretInput = document.getElementById('open-max-fret');
-    assert.equal(fretInput.value, '12');
-    assert.equal(openChips(dom).length, 96);
-    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="Gm7"]'));
-    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="C#m"]'));
+    assert.equal(window.OPEN_MAX_FRET, 12);
+    assert.ok(playableSymbols(window).includes('Gm7'));
+    assert.ok(playableSymbols(window).includes('C#m'));
 
-    fretInput.value = '3';
-    fretInput.dispatchEvent(new dom.window.Event('change'));
-    assert.equal(document.getElementById('open-chords-label').textContent, 'Playable chords in E A D G B E up to fret 3:');
-    assert.equal(openChips(dom).length, 94);
-    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="C#m"]'));
-    assert.equal(document.querySelector('#open-chords-list .match-chip[data-symbol="F#sus4"]'), null);
-    assert.equal(document.querySelector('#open-chords-list .match-chip[data-symbol="Bsus2"]'), null);
-    assert.ok(document.querySelector('#open-chords-list .chip-placeholder'));
+    window.OPEN_MAX_FRET = 3;
+    const tightSymbols = playableSymbols(window);
+    assert.equal(tightSymbols.length, 94);
+    assert.ok(tightSymbols.includes('C#m'));
+    assert.equal(tightSymbols.includes('F#sus4'), false);
+    assert.equal(tightSymbols.includes('Bsus2'), false);
 
-    fretInput.value = '12';
-    fretInput.dispatchEvent(new dom.window.Event('change'));
-    assert.equal(openChips(dom).length, 96);
-    assert.ok(document.querySelector('#open-chords-list .match-chip[data-symbol="Gm7"]'));
+    window.OPEN_MAX_FRET = 12;
+    assert.ok(playableSymbols(window).includes('Gm7'));
 
     dom.window.close();
 });
 
-test('selects alternate chord shapes with the shape slider', () => {
+test('ranks alternate chord shapes', () => {
     const dom = createApp();
-    const document = dom.window.document;
+    const window = dom.window;
 
-    function fingered() {
-        const notes = [...document.querySelectorAll('.fretboard .note')];
-        return [...document.querySelectorAll('.fretboard .note.finger-pos')].map((n) => {
-            const idx = notes.indexOf(n);
-            return { string: Math.floor(idx / 19) + 1, fret: idx % 19, note: n.getAttribute('data-note') };
-        });
-    }
-    function openRings() {
-        const notes = [...document.querySelectorAll('.fretboard .note')];
-        return [...document.querySelectorAll('.fretboard .note.voicing-open')].map((n) => {
-            const idx = notes.indexOf(n);
-            return { string: Math.floor(idx / 19) + 1, fret: idx % 19, note: n.getAttribute('data-note') };
-        });
-    }
-    function typeChord(value) {
-        const input = document.getElementById('chord-input');
-        input.value = value;
-        input.dispatchEvent(new dom.window.Event('input'));
-    }
-    function slide(value) {
-        const slider = document.getElementById('shape-slider');
-        slider.value = String(value);
-        slider.dispatchEvent(new dom.window.Event('input'));
+    function rankedShapes() {
+        const chord = window.activeChord;
+        const tuning = window.getCurrentTuning();
+        const mask = window.openRequiredMask(chord.ordered, chord.tonic);
+        return window.openVoicingRanked(tuning, chord.ordered, chord.tonic, window.OPEN_DISPLAY_MIN_OPEN_STRINGS, window.OPEN_MAX_FRET, mask, 6)
+            .map(voicingVector);
     }
 
-    const row = document.getElementById('shape-row');
-    const slider = document.getElementById('shape-slider');
-    const info = document.getElementById('shape-info');
+    inputValue(dom, 'C');
+    const cShapes = rankedShapes();
+    assert.equal(cShapes.length, 6);
+    assert.deepEqual(cShapes[0], voicingVector(bestVoicing(window)));
+    assert.equal(cShapes[0], 'x-3-2-0-1-0');
+    assert.equal(cShapes[1], 'x-3-2-0-1-3');
 
-    assert.equal(row.hidden, false);
-    assert.equal(slider.value, '1');
-    assert.equal(slider.max, '6');
-    assert.equal(slider.disabled, false);
-    assert.equal(info.textContent, '1/6 · x-3-2-0-1-0');
+    inputValue(dom, 'Cm');
+    const cmShapes = rankedShapes();
+    assert.equal(cmShapes.length, 6);
+    assert.equal(cmShapes[0], 'x-3-5-5-4-3');
+    assert.equal(cmShapes[1], '8-10-10-8-8-8');
 
-    slide(2);
-    assert.deepEqual(fingered(), [
-        { string: 1, fret: 3, note: 'G' },
-        { string: 2, fret: 1, note: 'C' },
-        { string: 4, fret: 2, note: 'E' },
-        { string: 5, fret: 3, note: 'C' },
-    ]);
-    assert.deepEqual(openRings(), [
-        { string: 3, fret: 0, note: 'G' },
-    ]);
-    assert.deepEqual(info.textContent, '2/6 · x-3-2-0-1-3');
-
-    slide(1);
-    assert.deepEqual(fingered(), [
-        { string: 2, fret: 1, note: 'C' },
-        { string: 4, fret: 2, note: 'E' },
-        { string: 5, fret: 3, note: 'C' },
-    ]);
-    assert.deepEqual(info.textContent, '1/6 · x-3-2-0-1-0');
-
-    typeChord('Cm');
-    assert.equal(slider.value, '1');
-    assert.equal(info.textContent, '1/6 · x-3-5-5-4-3');
-
-    slide(2);
-    assert.deepEqual(fingered(), [
-        { string: 4, fret: 10, note: 'C' },
-        { string: 5, fret: 10, note: 'G' },
-    ]);
-    assert.deepEqual(openRings(), []);
-    assert.equal(info.textContent, '2/6 · 8-10-10-8-8-8');
-
-    typeChord('Am');
-    assert.equal(slider.value, '1');
-    assert.equal(info.textContent, '1/6 · x-0-2-2-1-0');
-    assert.deepEqual(fingered(), [
-        { string: 2, fret: 1, note: 'C' },
-        { string: 3, fret: 2, note: 'A' },
-        { string: 4, fret: 2, note: 'E' },
-    ]);
-
-    typeChord('not-a-chord');
-    assert.equal(row.hidden, true);
+    inputValue(dom, 'Am');
+    assert.equal(rankedShapes()[0], 'x-0-2-2-1-0');
 
     dom.window.close();
 });
