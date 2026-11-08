@@ -442,6 +442,29 @@ select {
     align-items: stretch;
 }
 
+.shape-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 0.6rem;
+}
+
+.shape-row[hidden] {
+    display: none;
+}
+
+#shape-slider {
+    accent-color: #d4a017;
+    width: 8rem;
+}
+
+#shape-info {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
 #open-chords-list .match-chip {
     width: 100%;
     text-align: center;

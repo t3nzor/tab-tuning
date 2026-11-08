@@ -133,6 +133,9 @@ var activeScale = null;
 var showChord = true;
 var showIntervals = false;
 var showStickers = false;
+var shapeChoices = [];
+var shapeIndex = 0;
+var shapeKey = null;
 
 var CHORD_TYPES = [
     { name: 'major', label: 'Major', symbol: '' },
@@ -240,6 +243,7 @@ function clearHighlights() {
         notes[i].classList.remove('chord-tone', 'chord-root', 'scale-tone', 'scale-root');
     }
     clearFingering();
+    updateShapeControls();
 }
 
 function clearFingering() {
@@ -306,9 +310,37 @@ function barreFingerable(fret, strings, voicing) {
     return true;
 }
 
+function computeShapeKey(tuning, mask) {
+    return (activeChord ? activeChord.label : '') + '|' + tuning.join(',') + '|' + OPEN_MAX_FRET + '|' + mask;
+}
+
+function updateShapeControls() {
+    var row = document.getElementById('shape-row');
+    var slider = document.getElementById('shape-slider');
+    var info = document.getElementById('shape-info');
+    if (!row || !slider || !info) return;
+    if (!activeChord || !shapeChoices.length || !showChord) {
+        row.hidden = true;
+        return;
+    }
+    row.hidden = false;
+    slider.max = String(shapeChoices.length);
+    slider.disabled = shapeChoices.length < 2;
+    slider.value = String(shapeIndex + 1);
+    var voicing = shapeChoices[shapeIndex];
+    var vector = [];
+    for (var i = 0; i < voicing.length; i++) {
+        vector.push(voicing[i] ? (voicing[i][1] === 0 ? '0' : String(voicing[i][1])) : 'x');
+    }
+    info.textContent = (shapeIndex + 1) + '/' + shapeChoices.length + ' · ' + vector.join('-');
+}
+
 function renderFingering() {
     clearFingering();
-    if (!activeChord || !activeChord.ordered || !showChord) return;
+    if (!activeChord || !activeChord.ordered || !showChord) {
+        updateShapeControls();
+        return;
+    }
     var tuning = getCurrentTuning();
     var tones = activeChord.ordered;
     var requiredMask = (1 << tones.length) - 1;
@@ -319,7 +351,14 @@ function renderFingering() {
         var fifthIdx = tones.indexOf(fifth);
         if (fifthIdx !== -1) requiredMask &= ~(1 << fifthIdx);
     }
-    var voicing = openVoicingBest(tuning, tones, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS, OPEN_MAX_FRET, requiredMask);
+    var key = computeShapeKey(tuning, requiredMask);
+    if (shapeKey !== key) {
+        shapeKey = key;
+        shapeIndex = 0;
+        shapeChoices = openVoicingRanked(tuning, tones, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS, OPEN_MAX_FRET, requiredMask, OPEN_SHAPE_COUNT);
+    }
+    var voicing = shapeChoices[shapeIndex] || openVoicingBest(tuning, tones, activeChord.tonic, OPEN_DISPLAY_MIN_OPEN_STRINGS, OPEN_MAX_FRET, requiredMask);
+    updateShapeControls();
     if (!voicing) return;
     var cells = document.querySelectorAll('.fretboard .cell');
     if (!cells.length) return;
@@ -723,7 +762,7 @@ function openScoreLess(a, b) {
     return false;
 }
 
-function openVoicingScore(tuning, voicing, tonic) {
+function openVoicingScore(tuning, voicing, tonic, tones) {
     var maxFret = 0;
     var sumFret = 0;
     var sounded = 0;
@@ -756,11 +795,33 @@ function openVoicingScore(tuning, voicing, tonic) {
             if (voicing[m] && voicing[m][1] === 0) barrePenalty++;
         }
     });
+    var openNotes = {};
+    for (var s = 0; s < tuning.length; s++) {
+        if (tones.indexOf(tuning[s]) !== -1) openNotes[tuning[s]] = true;
+    }
+    var openCapable = Object.keys(openNotes).length;
+    var shortfall = 0;
+    var spread = 0;
+    if (openCapable <= 1) {
+        shortfall = sounded < 5 ? 5 - sounded : 0;
+        Object.keys(fretStrings).forEach(function(fret) {
+            var fretNum = Number(fret);
+            var strings = fretStrings[fret].slice().sort(function(a, b) { return a - b; });
+            for (var k = 1; k < strings.length; k++) {
+                for (var m = strings[k - 1] + 1; m < strings[k]; m++) {
+                    if (voicing[m] && voicing[m][1] < fretNum) {
+                        spread++;
+                        break;
+                    }
+                }
+            }
+        });
+    }
     var tiebreak = '';
     for (var j = 0; j < voicing.length; j++) {
         tiebreak += voicing[j] ? (voicing[j][1] < 10 ? '0' + voicing[j][1] : String(voicing[j][1])) : 'xx';
     }
-    return [rootBass, maxFret, -sounded, barrePenalty, sumFret, tiebreak];
+    return [rootBass, shortfall, spread, maxFret, -sounded, barrePenalty, sumFret, tiebreak];
 }
 
 var openVoicingMemo = { key: null, best: null };
@@ -773,7 +834,7 @@ function openVoicingBest(tuning, tones, tonic, minOpens, maxFret, requiredMask) 
     var best = null;
     var bestScore = null;
     openVoicingEach(tuning, tones, minOpens, maxFret, function(voicing) {
-        var score = openVoicingScore(tuning, voicing, tonic);
+        var score = openVoicingScore(tuning, voicing, tonic, tones);
         if (bestScore === null || openScoreLess(score, bestScore)) {
             bestScore = score;
             best = voicing;
@@ -783,6 +844,33 @@ function openVoicingBest(tuning, tones, tonic, minOpens, maxFret, requiredMask) 
     openVoicingMemo.key = key;
     openVoicingMemo.best = best ? best.slice() : null;
     return best ? best.slice() : null;
+}
+
+var OPEN_SHAPE_COUNT = 6;
+var openRankedMemo = { key: null, list: null };
+
+// Top OPEN_SHAPE_COUNT voicings by score (list[0] === openVoicingBest result).
+function openVoicingRanked(tuning, tones, tonic, minOpens, maxFret, requiredMask, limit) {
+    var key = tuning.join(',') + '|' + tones.join(',') + '|' + tonic + '|' + minOpens + '|' + maxFret + '|' + requiredMask + '|' + limit;
+    if (openRankedMemo.key === key) {
+        return openRankedMemo.list.map(function(v) { return v.slice(); });
+    }
+    var list = [];
+    openVoicingEach(tuning, tones, minOpens, maxFret, function(voicing) {
+        var score = openVoicingScore(tuning, voicing, tonic, tones);
+        var entry = { score: score, voicing: voicing };
+        var pos = list.length;
+        while (pos > 0 && openScoreLess(score, list[pos - 1].score)) pos--;
+        if (pos < limit) {
+            if (list.length >= limit) list.pop();
+            list.splice(pos, 0, entry);
+        }
+        return false;
+    }, requiredMask);
+    var voicings = list.map(function(e) { return e.voicing; });
+    openRankedMemo.key = key;
+    openRankedMemo.list = voicings.map(function(v) { return v.slice(); });
+    return voicings.map(function(v) { return v.slice(); });
 }
 
 function findOpenChords() {
@@ -891,6 +979,11 @@ function initChordControls() {
     document.getElementById('show-chord').addEventListener('change', function() {
         showChord = this.checked;
         highlightAll();
+    });
+
+    document.getElementById('shape-slider').addEventListener('input', function() {
+        shapeIndex = Math.min(Math.max(parseInt(this.value, 10) || 1, 1), shapeChoices.length) - 1;
+        renderFingering();
     });
 
     rootSelect.value = 'C';
