@@ -204,22 +204,26 @@ select {
     flex: 1;
 }
 
-.chord-btn-rows {
+.chord-btn-rows,
+.scale-btn-rows {
     max-width: 900px;
     margin: 0 auto 2rem;
 }
 
-.chord-btn-row {
+.chord-btn-row,
+.scale-btn-row {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
 }
 
-.chord-btn-row + .chord-btn-row {
+.chord-btn-row + .chord-btn-row,
+.scale-btn-row + .scale-btn-row {
     margin-top: 0.5rem;
 }
 
-.chord-btn {
+.chord-btn,
+.scale-btn {
     background: #16213e;
     color: #e0e0e0;
     border: 1px solid #444;
@@ -230,12 +234,14 @@ select {
     transition: background 0.15s, border-color 0.15s;
 }
 
-.chord-btn:hover {
+.chord-btn:hover,
+.scale-btn:hover {
     background: #1f3060;
     border-color: #666;
 }
 
-.chord-btn.active {
+.chord-btn.active,
+.scale-btn.active {
     border-color: #d4a017;
     background: #1f3060;
 }
@@ -296,7 +302,7 @@ select {
 
 .scale-row {
     max-width: 900px;
-    margin: 0 auto 2rem;
+    margin: 0 auto 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;

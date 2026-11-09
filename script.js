@@ -53,7 +53,7 @@ function renderFretboard() {
             var note = noteAt(openNote, f);
             var text = note;
             if (showIntervals) {
-                var ref = activeScale ? activeScale.tonic : document.getElementById('scale-root').value;
+                var ref = activeScale ? activeScale.tonic : scaleRoot;
                 if (ref) text = getIntervalName(ref, note);
             }
             var classes = ['cell'];
@@ -131,6 +131,8 @@ var activeChord = null;
 var activeScale = null;
 var chordRoot = 'C';
 var chordType = 'major';
+var scaleRoot = 'C';
+var scaleType = '';
 var showChord = true;
 var showIntervals = false;
 var showStickers = false;
@@ -392,8 +394,9 @@ function renderScaleMatches() {
         chips[i].addEventListener('click', function() {
             var root = this.getAttribute('data-root');
             var type = this.getAttribute('data-type');
-            document.getElementById('scale-root').value = root;
-            document.getElementById('scale-type').value = type;
+            scaleRoot = root;
+            scaleType = type;
+            updateScaleButtons();
             applyScale(root, type);
             renderScaleMatches();
         });
@@ -843,32 +846,54 @@ function initChordControls() {
     applyChord('C');
 }
 
+function updateScaleButtons() {
+    var rootButtons = document.querySelectorAll('#scale-roots .scale-btn');
+    for (var i = 0; i < rootButtons.length; i++) {
+        rootButtons[i].classList.toggle('active', rootButtons[i].getAttribute('data-root') === scaleRoot);
+    }
+    var typeButtons = document.querySelectorAll('#scale-types .scale-btn');
+    for (var j = 0; j < typeButtons.length; j++) {
+        typeButtons[j].classList.toggle('active', typeButtons[j].getAttribute('data-type') === scaleType);
+    }
+}
+
 function initScaleControls() {
-    var rootSelect = document.getElementById('scale-root');
+    var rootsRow = document.getElementById('scale-roots');
     NOTES.forEach(function(note) {
-        var option = document.createElement('option');
-        option.value = note;
-        option.textContent = note;
-        rootSelect.appendChild(option);
+        var button = document.createElement('button');
+        button.className = 'scale-btn';
+        button.setAttribute('data-root', note);
+        button.textContent = note;
+        button.addEventListener('click', function() {
+            scaleRoot = this.getAttribute('data-root');
+            applyScale(scaleRoot, scaleType);
+            updateScaleButtons();
+        });
+        rootsRow.appendChild(button);
     });
 
-    var typeSelect = document.getElementById('scale-type');
-    var noneOption = document.createElement('option');
-    noneOption.value = '';
-    noneOption.textContent = 'None';
-    typeSelect.appendChild(noneOption);
+    var typesRow = document.getElementById('scale-types');
+    var noneButton = document.createElement('button');
+    noneButton.className = 'scale-btn';
+    noneButton.setAttribute('data-type', '');
+    noneButton.textContent = 'None';
+    noneButton.addEventListener('click', function() {
+        scaleType = '';
+        applyScale(scaleRoot, '');
+        updateScaleButtons();
+    });
+    typesRow.appendChild(noneButton);
     SCALE_TYPES.forEach(function(t) {
-        var option = document.createElement('option');
-        option.value = t.name;
-        option.textContent = t.label;
-        typeSelect.appendChild(option);
-    });
-
-    rootSelect.addEventListener('change', function() {
-        applyScale(rootSelect.value, typeSelect.value);
-    });
-    typeSelect.addEventListener('change', function() {
-        applyScale(rootSelect.value, typeSelect.value);
+        var button = document.createElement('button');
+        button.className = 'scale-btn';
+        button.setAttribute('data-type', t.name);
+        button.textContent = t.short;
+        button.addEventListener('click', function() {
+            scaleType = this.getAttribute('data-type');
+            applyScale(scaleRoot, scaleType);
+            updateScaleButtons();
+        });
+        typesRow.appendChild(button);
     });
 
     document.getElementById('show-intervals').addEventListener('change', function() {
@@ -876,7 +901,9 @@ function initScaleControls() {
         renderFretboard();
     });
 
-    rootSelect.value = 'C';
+    scaleRoot = 'C';
+    scaleType = '';
+    updateScaleButtons();
 }
 
 // ---- Init ----

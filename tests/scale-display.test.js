@@ -18,13 +18,15 @@ function createApp() {
     return dom;
 }
 
-function selectScale(dom, root, type) {
+function clickScale(dom, root, type) {
     const { window } = dom;
-    const rootSelect = window.document.getElementById('scale-root');
-    const typeSelect = window.document.getElementById('scale-type');
-    rootSelect.value = root;
-    typeSelect.value = type;
-    typeSelect.dispatchEvent(new window.Event('change'));
+    const document = window.document;
+    document.querySelector(`#scale-roots .scale-btn[data-root="${root}"]`).click();
+    const typeButton = type === ''
+        ? document.querySelector('#scale-types .scale-btn[data-type=""]')
+        : document.querySelector(`#scale-types .scale-btn[data-type="${type}"]`);
+    typeButton.click();
+    return typeButton;
 }
 
 function changeValue(dom, id, value) {
@@ -90,7 +92,11 @@ test('initializes the fretboard with the default standard tuning and default C c
     assert.equal(document.querySelectorAll('#tuning-selects option').length, 72);
     assert.equal(document.querySelectorAll('.fretboard .note').length, 114);
     assert.equal(document.getElementById('chord-name').textContent, 'C');
-    assert.equal(document.getElementById('scale-type').value, '');
+    assert.ok(document.querySelector('#scale-types .scale-btn[data-type=""]').classList.contains('active'));
+    assert.equal(document.getElementById('scale-root'), null);
+    assert.equal(document.getElementById('scale-type'), null);
+    assert.equal(document.querySelectorAll('#scale-roots .scale-btn').length, 12);
+    assert.equal(document.querySelectorAll('#scale-types .scale-btn').length, 15);
     assert.ok(document.querySelector('.note[data-note="C"]').classList.contains('chord-root'));
     assert.equal(document.getElementById('chord-root'), null);
     assert.equal(document.getElementById('chord-type'), null);
@@ -200,7 +206,7 @@ test('builds chords from root and type buttons and hides only chord highlights',
     assert.ok(document.querySelector('#chord-types .chord-btn[data-type="dominant seventh"]').classList.contains('active'));
     assert.ok(document.querySelector('.chord-root'));
 
-    selectScale(dom, 'G', 'mixolydian');
+    clickScale(dom, 'G', 'mixolydian');
     const showChord = document.getElementById('show-chord');
     showChord.checked = false;
     showChord.dispatchEvent(new dom.window.Event('change'));
@@ -220,7 +226,7 @@ test('clears scales and keeps interval labels tied to the scale root', () => {
     const dom = createApp();
     const document = dom.window.document;
 
-    selectScale(dom, 'C', 'major');
+    clickScale(dom, 'C', 'major');
     const cNote = document.querySelector('.note[data-note="C"]');
     assert.ok(cNote.classList.contains('chord-root'));
     assert.ok(cNote.classList.contains('scale-root'));
@@ -230,10 +236,11 @@ test('clears scales and keeps interval labels tied to the scale root', () => {
     showIntervals.dispatchEvent(new dom.window.Event('change'));
     assert.equal(document.querySelector('.note[data-note="C"]').textContent, 'P1');
 
-    changeValue(dom, 'scale-type', '');
+    document.querySelector('#scale-types .scale-btn[data-type=""]').click();
     assert.equal(document.getElementById('scale-name').textContent, '');
     assert.equal(document.getElementById('scale-notes').textContent, '');
     assert.equal(document.querySelector('.scale-tone, .scale-root'), null);
+    assert.ok(document.querySelector('#scale-types .scale-btn[data-type=""]').classList.contains('active'));
     assert.ok(document.querySelector('.chord-root'));
     assert.equal(document.querySelector('.note[data-note="C"]').textContent, 'P1');
 
@@ -252,8 +259,8 @@ test('activates a scale from a chord compatibility chip', () => {
     assert.ok(chip);
     chip.click();
 
-    assert.equal(document.getElementById('scale-root').value, 'C');
-    assert.equal(document.getElementById('scale-type').value, 'major');
+    assert.ok(document.querySelector('#scale-roots .scale-btn[data-root="C"]').classList.contains('active'));
+    assert.ok(document.querySelector('#scale-types .scale-btn[data-type="major"]').classList.contains('active'));
     assert.equal(document.getElementById('scale-name').textContent, 'C Major');
     assert.ok(document.querySelector('.match-chip[data-root="C"][data-type="major"]').classList.contains('active'));
     const cNote = document.querySelector('.note[data-note="C"]');
@@ -265,7 +272,7 @@ test('activates a scale from a chord compatibility chip', () => {
 
 test('G Dorian keeps diatonic note spelling and capitalizes its label', () => {
     const dom = createApp();
-    selectScale(dom, 'G', 'dorian');
+    clickScale(dom, 'G', 'dorian');
 
     const document = dom.window.document;
     assert.equal(document.getElementById('scale-name').textContent, 'G Dorian');
@@ -277,7 +284,7 @@ test('G Dorian keeps diatonic note spelling and capitalizes its label', () => {
 
 test('sharp-key scales retain necessary letter spellings', () => {
     const dom = createApp();
-    selectScale(dom, 'F#', 'major');
+    clickScale(dom, 'F#', 'major');
 
     const document = dom.window.document;
     assert.equal(document.getElementById('scale-name').textContent, 'F# Major');
@@ -292,7 +299,7 @@ test('shows clickable diatonic chords for the active scale', () => {
 
     assert.equal(document.querySelectorAll('#diatonic-list .match-chip').length, 0);
 
-    selectScale(dom, 'C', 'major');
+    clickScale(dom, 'C', 'major');
     const buttons = [...document.querySelectorAll('#diatonic-list .match-chip')];
     assert.equal(buttons.length, 7);
     const expected = ['I · C', 'ii · Dm', 'iii · Em', 'IV · F', 'V · G', 'vi · Am', 'vii° · Bdim'];
@@ -314,20 +321,20 @@ test('derives diatonic chords from the parent scale for pentatonic and blues sca
     const dom = createApp();
     const document = dom.window.document;
 
-    selectScale(dom, 'A', 'harmonic minor');
+    clickScale(dom, 'A', 'harmonic minor');
     let labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
     assert.deepEqual(labels, ['i · Am', 'ii° · Bdim', 'III+ · Caug', 'iv · Dm', 'V · E', 'VI · F', 'vii° · G#dim']);
 
-    selectScale(dom, 'A', 'minor pentatonic');
+    clickScale(dom, 'A', 'minor pentatonic');
     labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
     assert.deepEqual(labels, ['i · Am', 'III · C', 'iv · Dm', 'v · Em', 'VII · G']);
     assert.equal(document.getElementById('diatonic-label').textContent, 'Diatonic chords in A Minor Pentatonic (numbered from A Minor):');
 
-    selectScale(dom, 'C', 'major pentatonic');
+    clickScale(dom, 'C', 'major pentatonic');
     labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
     assert.deepEqual(labels, ['I · C', 'ii · Dm', 'iii · Em', 'V · G', 'vi · Am']);
 
-    selectScale(dom, 'A', 'minor blues');
+    clickScale(dom, 'A', 'minor blues');
     labels = [...document.querySelectorAll('#diatonic-list .match-chip')].map((b) => b.textContent);
     assert.deepEqual(labels, ['i · Am', 'III · C', 'iv · Dm', 'v · Em', 'VII · G']);
 
