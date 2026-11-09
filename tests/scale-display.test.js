@@ -92,6 +92,13 @@ test('initializes the fretboard with the default standard tuning and default C c
     assert.equal(document.getElementById('chord-name').textContent, 'C');
     assert.equal(document.getElementById('scale-type').value, '');
     assert.ok(document.querySelector('.note[data-note="C"]').classList.contains('chord-root'));
+    assert.equal(document.getElementById('chord-root'), null);
+    assert.equal(document.getElementById('chord-type'), null);
+    assert.equal(document.querySelectorAll('#chord-roots .chord-btn').length, 12);
+    assert.equal(document.querySelectorAll('#chord-types .chord-btn').length, 20);
+    assert.equal(document.querySelector('#chord-roots .chord-btn[data-root="C"]').textContent, 'C');
+    assert.ok(document.querySelector('#chord-roots .chord-btn[data-root="C"]').classList.contains('active'));
+    assert.ok(document.querySelector('#chord-types .chord-btn[data-type="major"]').classList.contains('active'));
     assert.equal(document.getElementById('open-max-fret'), null);
     assert.equal(document.getElementById('open-chords-list'), null);
     assert.equal(document.getElementById('shape-slider'), null);
@@ -163,8 +170,8 @@ test('updates and clears chord state from free-form chord input', () => {
     assert.equal(input.classList.contains('invalid'), false);
     assert.equal(document.getElementById('chord-name').textContent, 'Am7');
     assert.equal(document.getElementById('detected-notes').textContent, 'A C E G');
-    assert.equal(document.getElementById('chord-root').value, 'A');
-    assert.equal(document.getElementById('chord-type').value, 'minor seventh');
+    assert.ok(document.querySelector('#chord-roots .chord-btn[data-root="A"]').classList.contains('active'));
+    assert.ok(document.querySelector('#chord-types .chord-btn[data-type="minor seventh"]').classList.contains('active'));
     assert.ok(document.querySelector('.note[data-note="A"]').classList.contains('chord-root'));
     assert.ok(document.querySelector('.match-chip'));
 
@@ -181,14 +188,16 @@ test('updates and clears chord state from free-form chord input', () => {
     dom.window.close();
 });
 
-test('builds chords from controls and hides only chord highlights', () => {
+test('builds chords from root and type buttons and hides only chord highlights', () => {
     const dom = createApp();
     const document = dom.window.document;
 
-    changeValue(dom, 'chord-root', 'G');
-    changeValue(dom, 'chord-type', 'dominant seventh');
+    document.querySelector('#chord-roots .chord-btn[data-root="G"]').click();
+    document.querySelector('#chord-types .chord-btn[data-type="dominant seventh"]').click();
     assert.equal(document.getElementById('chord-input').value, 'G7');
     assert.equal(document.getElementById('chord-name').textContent, 'G7');
+    assert.ok(document.querySelector('#chord-roots .chord-btn[data-root="G"]').classList.contains('active'));
+    assert.ok(document.querySelector('#chord-types .chord-btn[data-type="dominant seventh"]').classList.contains('active'));
     assert.ok(document.querySelector('.chord-root'));
 
     selectScale(dom, 'G', 'mixolydian');
@@ -293,8 +302,8 @@ test('shows clickable diatonic chords for the active scale', () => {
     buttons[1].click();
     assert.equal(document.getElementById('chord-name').textContent, 'Dm');
     assert.equal(document.getElementById('chord-input').value, 'Dm');
-    assert.equal(document.getElementById('chord-root').value, 'D');
-    assert.equal(document.getElementById('chord-type').value, 'minor');
+    assert.ok(document.querySelector('#chord-roots .chord-btn[data-root="D"]').classList.contains('active'));
+    assert.ok(document.querySelector('#chord-types .chord-btn[data-type="minor"]').classList.contains('active'));
     assert.ok(document.querySelector('.note[data-note="D"]').classList.contains('chord-root'));
     assert.ok(document.querySelector('#diatonic-list .match-chip[data-symbol="Dm"]').classList.contains('active'));
 

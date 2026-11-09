@@ -129,6 +129,8 @@ function applyPreset(preset) {
 var hasTonal = typeof Tonal !== 'undefined' && Tonal.Chord;
 var activeChord = null;
 var activeScale = null;
+var chordRoot = 'C';
+var chordType = 'major';
 var showChord = true;
 var showIntervals = false;
 var showStickers = false;
@@ -289,12 +291,29 @@ function applyChord(symbol) {
     activeChord = { notes: notesSet, tonic: tonic, label: symbol.trim(), ordered: notes };
     displayChord(symbol.trim(), notes);
     highlightAll();
-    document.getElementById('chord-root').value = tonic;
+    chordRoot = tonic;
     var typeEntry = CHORD_TYPES.find(function(t) { return t.name === chord.type; });
     if (typeEntry) {
-        document.getElementById('chord-type').value = chord.type;
+        chordType = chord.type;
     }
+    updateChordButtons();
     renderScaleMatches();
+}
+
+function updateChordButtons() {
+    var rootButtons = document.querySelectorAll('#chord-roots .chord-btn');
+    for (var i = 0; i < rootButtons.length; i++) {
+        rootButtons[i].classList.toggle('active', rootButtons[i].getAttribute('data-root') === chordRoot);
+    }
+    var typeButtons = document.querySelectorAll('#chord-types .chord-btn');
+    for (var j = 0; j < typeButtons.length; j++) {
+        typeButtons[j].classList.toggle('active', typeButtons[j].getAttribute('data-type') === chordType);
+    }
+}
+
+function currentChordSymbol() {
+    var entry = CHORD_TYPES.find(function(t) { return t.name === chordType; });
+    return entry ? chordRoot + entry.symbol : chordRoot;
 }
 
 function applyScale(root, typeName) {
@@ -776,48 +795,51 @@ function findOpenChords() {
 }
 
 function initChordControls() {
-    var rootSelect = document.getElementById('chord-root');
+    var rootsRow = document.getElementById('chord-roots');
     NOTES.forEach(function(note) {
-        var option = document.createElement('option');
-        option.value = note;
-        option.textContent = note;
-        rootSelect.appendChild(option);
+        var button = document.createElement('button');
+        button.className = 'chord-btn';
+        button.setAttribute('data-root', note);
+        button.textContent = note;
+        button.addEventListener('click', function() {
+            chordRoot = this.getAttribute('data-root');
+            var symbol = currentChordSymbol();
+            document.getElementById('chord-input').value = symbol;
+            applyChord(symbol);
+            updateChordButtons();
+        });
+        rootsRow.appendChild(button);
     });
 
-    var typeSelect = document.getElementById('chord-type');
+    var typesRow = document.getElementById('chord-types');
     CHORD_TYPES.forEach(function(t) {
-        var option = document.createElement('option');
-        option.value = t.name;
-        option.textContent = t.label;
-        typeSelect.appendChild(option);
+        var button = document.createElement('button');
+        button.className = 'chord-btn';
+        button.setAttribute('data-type', t.name);
+        button.textContent = t.name === 'major' ? 'maj' : (t.name === 'minor') ? 'm' : t.label;
+        button.addEventListener('click', function() {
+            chordType = this.getAttribute('data-type');
+            var symbol = currentChordSymbol();
+            document.getElementById('chord-input').value = symbol;
+            applyChord(symbol);
+            updateChordButtons();
+        });
+        typesRow.appendChild(button);
     });
 
-    var chordInput = document.getElementById('chord-input');
-
-    chordInput.addEventListener('input', function() {
-        applyChord(chordInput.value);
+    document.getElementById('chord-input').addEventListener('input', function() {
+        applyChord(this.value);
     });
-
-    function onSelectChange() {
-        var root = rootSelect.value;
-        var type = typeSelect.value;
-        var entry = CHORD_TYPES.find(function(t) { return t.name === type; });
-        var symbol = entry ? root + entry.symbol : root;
-        chordInput.value = symbol;
-        applyChord(symbol);
-    }
-
-    rootSelect.addEventListener('change', onSelectChange);
-    typeSelect.addEventListener('change', onSelectChange);
 
     document.getElementById('show-chord').addEventListener('change', function() {
         showChord = this.checked;
         highlightAll();
     });
 
-    rootSelect.value = 'C';
-    typeSelect.value = 'major';
-    chordInput.value = 'C';
+    chordRoot = 'C';
+    chordType = 'major';
+    updateChordButtons();
+    document.getElementById('chord-input').value = 'C';
     applyChord('C');
 }
 

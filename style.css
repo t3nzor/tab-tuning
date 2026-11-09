@@ -175,7 +175,7 @@ select {
 
 .chord-row {
     max-width: 900px;
-    margin: 0 auto 2rem;
+    margin: 0 auto 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -203,6 +203,43 @@ select {
 .chord-display {
     flex: 1;
 }
+
+.chord-btn-rows {
+    max-width: 900px;
+    margin: 0 auto 2rem;
+}
+
+.chord-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.chord-btn-row + .chord-btn-row {
+    margin-top: 0.5rem;
+}
+
+.chord-btn {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    padding: 0.25rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.chord-btn:hover {
+    background: #1f3060;
+    border-color: #666;
+}
+
+.chord-btn.active {
+    border-color: #d4a017;
+    background: #1f3060;
+}
+
 
 .show-chord {
     display: flex;

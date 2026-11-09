@@ -20,13 +20,15 @@
     </div>
     <div class="chord-row">
         <input type="text" id="chord-input" placeholder="Chord (e.g. Cmaj7, Am, G7)" spellcheck="false">
-        <select id="chord-root"></select>
-        <select id="chord-type"></select>
         <label class="show-chord"><input type="checkbox" id="show-chord" checked autocomplete="off"> Chord</label>
         <div class="chord-display">
             <div id="chord-name"></div>
             <div id="detected-notes"></div>
         </div>
+    </div>
+    <div class="chord-btn-rows">
+        <div class="chord-btn-row" id="chord-roots"></div>
+        <div class="chord-btn-row" id="chord-types"></div>
     </div>
     <div class="scale-row">
         <label>Scale</label>
