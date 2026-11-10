@@ -10,7 +10,7 @@ An interactive guitar fretboard note chart with chord and scale pickers, in the 
 - **Chord picker** — type any chord symbol (`Cmaj7`, `Am`, `G7`…) or build one from clickable root buttons (all 12 chromatic notes) and chord-type buttons (20 common types: maj, m, 7, maj7, m7, dim, aug, sus2, sus4, and more)
 - **Scale/mode picker** — click a root button + scale-type button (14 scales: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Major/Minor Pentatonic, Blues, Major Blues, Harmonic Minor, Melodic Minor, Harmonic Major, plus a None button to clear). Defaults to None
 - **Diatonic chord buttons** — for any active scale, the row below shows its diatonic triads (`I · C`, `ii · Dm`, `vii° · Bdim`…) as clickable chips; click one to light that chord up as the active chord. Pentatonic and blues scales use the triads of their parent major/minor scale (same tonic), numbered per the parent
-- **Dual highlighting** — chord tones glow amber (root: orange); scale tones glow green (root: deep green). Notes in both get a green ring. Both layers update automatically when you switch tunings
+- **Dual highlighting** — chord tones glow amber (root: orange); scale tones glow a muted brown (root: dark brown). Notes in both get a brown ring. Both layers update automatically when you switch tunings
 - **Chord visibility toggle** — uncheck the **Chord** box to hide the chord's fretboard highlighting while keeping its name and scale matches visible, so you can study a scale on its own
 - **Chord–scale compatibility** — for any active chord, a chip list shows every scale (of the 14 types × 12 roots) that contains all the chord's notes. Click a chip to light that scale up on the fretboard
 
@@ -37,8 +37,8 @@ npm test
 
 1. Pick a tuning preset from the dropdown, or tweak any string to switch to a custom tuning
 2. Type a chord symbol in the text field (e.g. `Am7`, `G/B`, `F#dim`), or click a root button and a chord-type button in the two rows below — the text field and buttons stay in sync
-3. Click a scale root button and a scale-type button (or None to clear). Chord and scale highlights are active simultaneously — notes that belong to both get a green ring
-4. The chip lists below the fretboard show the active scale's diatonic chords and every scale the current chord appears in; click one to select it. The currently-selected scale's chip is outlined in green
+3. Click a scale root button and a scale-type button (or None to clear). Chord and scale highlights are active simultaneously — notes that belong to both get a brown ring
+4. The chip lists below the fretboard show the active scale's diatonic chords and every scale the current chord appears in; click one to select it. The currently-selected scale's chip is outlined in brown
 5. Uncheck the **Chord** box to view the scale's notes without the chord's amber/orange highlights (the chord itself stays selected)
 6. Invalid chord text shows a red border and clears the chord; switching tuning preserves both highlights
 

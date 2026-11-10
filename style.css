@@ -268,7 +268,7 @@ select {
     font-size: 0.8rem;
     flex-shrink: 0;
     cursor: pointer;
-    accent-color: #3e8e6e;
+    accent-color: #8a6642;
 }
 
 #chord-name {
@@ -330,12 +330,12 @@ select {
 }
 
 .note.scale-tone {
-    background: #3e8e6e;
+    background: #8a6642;
     color: #fff;
 }
 
 .note.scale-root {
-    background: #1f6e4e;
+    background: #5f4326;
     color: #fff;
     font-weight: 700;
 }
@@ -343,61 +343,61 @@ select {
 .note.scale-tone.chord-tone {
     background: #d4a017;
     color: #1a1a2e;
-    box-shadow: 0 0 0 2px #3e8e6e;
+    box-shadow: 0 0 0 2px #8a6642;
 }
 
 .note.scale-root.chord-tone {
     background: #d4a017;
     color: #1a1a2e;
-    box-shadow: 0 0 0 2px #1f6e4e;
+    box-shadow: 0 0 0 2px #5f4326;
 }
 
 .note.scale-tone.chord-root {
     background: #e85d04;
     color: #fff;
     font-weight: 700;
-    box-shadow: 0 0 0 2px #3e8e6e;
+    box-shadow: 0 0 0 2px #8a6642;
 }
 
 .note.scale-root.chord-root {
     background: #e85d04;
     color: #fff;
     font-weight: 700;
-    box-shadow: 0 0 0 2px #1f6e4e;
+    box-shadow: 0 0 0 2px #5f4326;
 }
 
 .cell.nut .note.scale-tone {
-    background: #3e8e6e;
+    background: #8a6642;
     color: #fff;
 }
 
 .cell.nut .note.scale-root {
-    background: #1f6e4e;
+    background: #5f4326;
     color: #fff;
 }
 
 .cell.nut .note.scale-tone.chord-tone {
     background: #d4a017;
     color: #1a1a2e;
-    box-shadow: 0 0 0 2px #3e8e6e;
+    box-shadow: 0 0 0 2px #8a6642;
 }
 
 .cell.nut .note.scale-root.chord-tone {
     background: #d4a017;
     color: #1a1a2e;
-    box-shadow: 0 0 0 2px #1f6e4e;
+    box-shadow: 0 0 0 2px #5f4326;
 }
 
 .cell.nut .note.scale-tone.chord-root {
     background: #e85d04;
     color: #fff;
-    box-shadow: 0 0 0 2px #3e8e6e;
+    box-shadow: 0 0 0 2px #8a6642;
 }
 
 .cell.nut .note.scale-root.chord-root {
     background: #e85d04;
     color: #fff;
-    box-shadow: 0 0 0 2px #1f6e4e;
+    box-shadow: 0 0 0 2px #5f4326;
 }
 
 .matches-row {
@@ -438,6 +438,6 @@ select {
 }
 
 .match-chip.active {
-    border-color: #3e8e6e;
+    border-color: #8a6642;
     background: #1f3060;
 }
